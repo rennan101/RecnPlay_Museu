@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Rec'n'Play Museu - Realidade Aumentada</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="app">
+    <!-- Camada de Câmera Realtime -->
+    <div id="camera-container">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="overlay-canvas"></canvas>
+    </div>
+
+    <!-- Barra de Topo / Status -->
+    <header class="top-bar">
+      <div class="brand-badge">
+        <span class="brand-pulse"></span>
+        <span class="brand-title">Rec'n'Play Museu AR</span>
+      </div>
+      <div class="top-actions">
+        <button id="flip-camera-btn" class="icon-btn" title="Alternar Câmera">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+          </svg>
+        </button>
+        <button id="help-btn" class="icon-btn" title="Informações e Ajuda">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Mira HUD Inteligente -->
+    <div id="hud-viewfinder" class="hud-viewfinder">
+      <div class="hud-corners">
+        <div class="hud-corner tl"></div>
+        <div class="hud-corner tr"></div>
+        <div class="hud-corner bl"></div>
+        <div class="hud-corner br"></div>
+        <div class="hud-scan-line"></div>
+      </div>
+      <div id="hud-status" class="hud-label">Iniciando câmera...</div>
+    </div>
+
+    <!-- Card de Informação Flutuante Ancorado -->
+    <div id="floating-card-container">
+      <div class="info-card">
+        <div class="card-header">
+          <div>
+            <span id="card-badge" class="badge-tag">Arqueologia</span>
+            <h2 id="card-title" class="card-title">Flautista</h2>
+            <div id="card-subtitle" class="card-subtitle">Homem pré-histórico</div>
+          </div>
+          <button id="audio-play-btn" class="card-audio-btn" title="Ouvir Narração">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            </svg>
+          </button>
+        </div>
+
+        <div class="card-body">
+          <p id="card-description" class="card-description"></p>
+          <div id="card-facts" class="card-facts"></div>
+        </div>
+      </div>
+    </div>
+
+
+
+    <!-- Modal de Ajuda / Instruções -->
+    <div id="help-modal" class="modal-overlay">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 class="modal-title">Como funciona a experiência AR</h3>
+          <button id="close-help" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p><strong>1. Reconhecimento Direto do Objeto:</strong> Aponte o celular diretamente para a peça 3D exposta (sem necessidade de QR Code ou placas).</p>
+          <p><strong>2. Detecção em Tempo Real:</strong> A mira no centro da tela detectará a geometria do objeto e exibirá os dados históricos ao lado da peça.</p>
+          <p><strong>3. Acessibilidade com Áudio:</strong> Toque no ícone de som no card para escutar a audiodescrição do item.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts Vanilla Puros -->
+  <script src="data.js"></script>
+  <script src="recognition.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

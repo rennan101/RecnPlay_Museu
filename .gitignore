@@ -1,0 +1,20 @@
+# Modelos 3D Pesados (Arquivos fonte e zips de escaneamento)
+Modelos 3D/
+*.zip
+*.stl
+*.obj
+*.mtl
+*.blend
+*.blend1
+
+# Sistema Operacional / Mac
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs e arquivos temporários
+*.log
