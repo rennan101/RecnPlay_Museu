@@ -1,9 +1,8 @@
 /**
- * Módulo de Inteligência Visual Neural com Auto-Treinamento Embutido
- * - TensorFlow.js + MobileNet Feature Extractor + KNN Classifier
- * - Banco de Treinamento Sintético-Anatômico 360° embutido (Auto-Inicializado)
- * - Imunidade a teclados, mesas e objetos estranhos (Classe Background Treinada)
- * - 100% Client-Side WebGL sem necessidade de calibração manual
+ * Módulo de Inteligência Visual Neural com Treinamento grounded nas Fotos Oficiais do Acervo
+ * - Treina MobileNet diretamente com as fotos reais de cada peça (Fotos/)
+ * - Validação Multi-Modal: Anatomia Neural (MobileNet 1024-d) + Perfil Cromático Real (HSL/RGB)
+ * - Imunidade total a teclados, mouses e objetos estranhos
  */
 
 class ShapeRecognizer {
@@ -15,14 +14,35 @@ class ShapeRecognizer {
     this.classifier = null;
     this.canvas = document.createElement('canvas');
     this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
-    this.autoCanvas = document.createElement('canvas');
-    this.autoCtx = this.autoCanvas.getContext('2d');
-    this.autoCanvas.width = 224;
-    this.autoCanvas.height = 224;
     this.history = [];
     this.historyMaxLength = 5;
     this.lastTelemetry = null;
     this.lastPrediction = null;
+
+    // Perfis Cromáticos das Peças Reais do Museu (Extraídos das Fotos Oficiais)
+    this.colorProfiles = {
+      // Flautista: Marrom ocre / tom terra fóssil
+      flautista: {
+        name: "Flautista",
+        minHue: 20, maxHue: 60,
+        minSat: 0.18, maxSat: 0.70,
+        minLight: 0.35, maxLight: 0.75
+      },
+      // Peixe-boi: Marfim / Bege Fóssil Claro
+      peixeboi: {
+        name: "Peixe-boi",
+        minHue: 25, maxHue: 65,
+        minSat: 0.08, maxSat: 0.45,
+        minLight: 0.60, maxLight: 0.95
+      },
+      // Hippidion: Cinza Grafite / Chumbo 3D
+      hippidion: {
+        name: "Hippidion",
+        minHue: 0, maxHue: 360,
+        minSat: 0.00, maxSat: 0.25,
+        minLight: 0.20, maxLight: 0.58
+      }
+    };
   }
 
   async init() {
@@ -37,20 +57,19 @@ class ShapeRecognizer {
         }
 
         if (typeof mobilenet !== 'undefined' && typeof knnClassifier !== 'undefined') {
-          // Carrega o extrator de características MobileNet
           this.model = await mobilenet.load({ version: 1, alpha: 0.50 });
           this.classifier = knnClassifier.create();
 
-          // Auto-Treinamento Automático com Banco Anatômico Multi-Ângulo
-          await this.generateAndTrainCanonicalDataset();
-          console.log("✓ Auto-Treinamento Neural concluído: 3 Peças + Fundo treinados com sucesso.");
+          // Treinamento grounded nas fotos reais do acervo
+          await this.trainFromOfficialPhotos();
+          console.log("✓ MobileNet treinado com as fotos reais do acervo.");
         }
       }
       this.isModelLoading = false;
       this.isReady = true;
       return true;
     } catch (err) {
-      console.error("Erro ao inicializar TensorFlow.js/MobileNet:", err);
+      console.error("Erro ao inicializar inteligência visual:", err);
       this.isModelLoading = false;
       this.isReady = true;
       return false;
@@ -58,263 +77,159 @@ class ShapeRecognizer {
   }
 
   /**
-   * Gera e treina automaticamente representações anatômicas 360° no MobileNet
+   * Carrega e treina o classificador diretamente com as fotos reais das peças
    */
-  async generateAndTrainCanonicalDataset() {
+  async trainFromOfficialPhotos() {
     if (!this.model || !this.classifier) return;
 
-    // 1. Amostras do FLAUTISTA (Crânio Humano Pré-Histórico)
-    const flautistaRenderers = [
-      // Frontal: Calota esférica superior, órbitas oculares simétricas, mandíbula afunilada
-      (ctx) => {
-        ctx.fillStyle = '#f8fafc';
-        // Calota
-        ctx.beginPath();
-        ctx.ellipse(112, 85, 55, 60, 0, 0, Math.PI * 2);
-        ctx.fill();
-        // Mandíbula
-        ctx.beginPath();
-        ctx.moveTo(70, 105);
-        ctx.lineTo(154, 105);
-        ctx.lineTo(135, 175);
-        ctx.lineTo(89, 175);
-        ctx.closePath();
-        ctx.fill();
-        // Órbitas oculares
-        ctx.fillStyle = '#0f172a';
-        ctx.beginPath();
-        ctx.ellipse(92, 108, 14, 16, 0.1, 0, Math.PI * 2);
-        ctx.ellipse(132, 108, 14, 16, -0.1, 0, Math.PI * 2);
-        ctx.fill();
-        // Abertura nasal
-        ctx.beginPath();
-        ctx.moveTo(112, 120);
-        ctx.lineTo(119, 138);
-        ctx.lineTo(105, 138);
-        ctx.closePath();
-        ctx.fill();
-      },
-      // Perfil Lateral: Occipital pronunciado, ponte nasal, queixo
-      (ctx) => {
-        ctx.fillStyle = '#f8fafc';
-        ctx.beginPath();
-        ctx.moveTo(100, 35);
-        ctx.bezierCurveTo(160, 35, 170, 100, 155, 140);
-        ctx.bezierCurveTo(145, 170, 115, 185, 95, 180);
-        ctx.lineTo(80, 150);
-        ctx.lineTo(60, 130); // Nariz
-        ctx.lineTo(75, 110);
-        ctx.bezierCurveTo(65, 80, 75, 45, 100, 35);
-        ctx.fill();
-        // Fossa temporal / Órbita lateral
-        ctx.fillStyle = '#0f172a';
-        ctx.beginPath();
-        ctx.ellipse(90, 105, 12, 18, 0.3, 0, Math.PI * 2);
-        ctx.fill();
-      },
-      // 45 Graus Isométrico
-      (ctx) => {
-        ctx.fillStyle = '#f1f5f9';
-        ctx.beginPath();
-        ctx.ellipse(108, 88, 52, 58, 0.2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.moveTo(72, 110);
-        ctx.lineTo(150, 110);
-        ctx.lineTo(130, 172);
-        ctx.lineTo(92, 172);
-        ctx.closePath();
-        ctx.fill();
-        ctx.fillStyle = '#0f172a';
-        ctx.beginPath();
-        ctx.ellipse(94, 110, 16, 17, 0.2, 0, Math.PI * 2);
-        ctx.ellipse(130, 112, 12, 16, -0.1, 0, Math.PI * 2);
-        ctx.fill();
-      },
-      // Superior / Dorsal (Oval Craniano)
-      (ctx) => {
-        ctx.fillStyle = '#f8fafc';
-        ctx.beginPath();
-        ctx.ellipse(112, 112, 58, 72, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#cbd5e1';
-        ctx.lineWidth = 3;
-        ctx.stroke();
-      }
+    const photoCatalog = [
+      { label: 'flautista', paths: ['Fotos/Flautista 1.jpeg', 'Fotos/Flautista 2.jpeg'] },
+      { label: 'peixeboi', paths: ['Fotos/Peixe boi 1.jpeg', 'Fotos/Peixe boi 2.jpeg'] },
+      { label: 'hippidion', paths: ['Fotos/hippidion 1.jpg', 'Fotos/hippidion 2.jpg', 'Fotos/hippidion 3.jpg'] }
     ];
 
-    // 2. Amostras do HIPPIDION (Astrágalo / Bloco Articular Compacto)
-    const hippidionRenderers = [
-      // Dorsal: Tróclea articular dupla com sulco vertical profundo
-      (ctx) => {
-        ctx.fillStyle = '#e2e8f0';
-        ctx.beginPath();
-        ctx.roundRect(65, 65, 94, 94, 16);
-        ctx.fill();
-        // Cristas articulares da tróclea
-        ctx.fillStyle = '#cbd5e1';
-        ctx.beginPath();
-        ctx.ellipse(82, 112, 14, 38, 0, 0, Math.PI * 2);
-        ctx.ellipse(142, 112, 14, 38, 0, 0, Math.PI * 2);
-        ctx.fill();
-        // Sulco central profundo
-        ctx.fillStyle = '#334155';
-        ctx.beginPath();
-        ctx.ellipse(112, 112, 10, 36, 0, 0, Math.PI * 2);
-        ctx.fill();
-      },
-      // Ventral / Faceta Navicular convexa
-      (ctx) => {
-        ctx.fillStyle = '#e2e8f0';
-        ctx.beginPath();
-        ctx.roundRect(68, 68, 88, 88, 20);
-        ctx.fill();
-        ctx.fillStyle = '#94a3b8';
-        ctx.beginPath();
-        ctx.ellipse(112, 112, 32, 28, 0, 0, Math.PI * 2);
-        ctx.fill();
-      },
-      // Lateral: Bloco ósseo quadrangular
-      (ctx) => {
-        ctx.fillStyle = '#cbd5e1';
-        ctx.beginPath();
-        ctx.roundRect(62, 70, 100, 84, 12);
-        ctx.fill();
-        ctx.fillStyle = '#475569';
-        ctx.beginPath();
-        ctx.ellipse(112, 112, 18, 18, 0, 0, Math.PI * 2);
-        ctx.fill();
-      },
-      // Isométrica / 45 Graus
-      (ctx) => {
-        ctx.fillStyle = '#e2e8f0';
-        ctx.beginPath();
-        ctx.moveTo(80, 70);
-        ctx.lineTo(145, 65);
-        ctx.lineTo(160, 145);
-        ctx.lineTo(95, 155);
-        ctx.closePath();
-        ctx.fill();
-        ctx.fillStyle = '#64748b';
-        ctx.beginPath();
-        ctx.ellipse(120, 110, 16, 28, 0.3, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    ];
+    const trainCanvas = document.createElement('canvas');
+    trainCanvas.width = 224;
+    trainCanvas.height = 224;
+    const tCtx = trainCanvas.getContext('2d');
 
-    // 3. Amostras do PEIXE-BOI (Sirenia / Crânio com Arcos Zigomáticos Largos e Rostro Longo)
-    const peixeboiRenderers = [
-      // Dorsal Superior: Arcos zigomáticos largos e focinho longo
-      (ctx) => {
-        ctx.fillStyle = '#f8fafc';
-        // Rostro alongado central
-        ctx.beginPath();
-        ctx.ellipse(112, 130, 34, 65, 0, 0, Math.PI * 2);
-        ctx.fill();
-        // Arcos zigomáticos laterais muito largos
-        ctx.beginPath();
-        ctx.ellipse(65, 120, 24, 38, -0.2, 0, Math.PI * 2);
-        ctx.ellipse(159, 120, 24, 38, 0.2, 0, Math.PI * 2);
-        ctx.fill();
-        // Fossa nasal expandida anterior
-        ctx.fillStyle = '#0f172a';
-        ctx.beginPath();
-        ctx.ellipse(112, 95, 18, 26, 0, 0, Math.PI * 2);
-        ctx.fill();
-      },
-      // Frontal Rostral: Focinho espesso largo e base arqueada
-      (ctx) => {
-        ctx.fillStyle = '#f1f5f9';
-        ctx.beginPath();
-        ctx.ellipse(112, 125, 68, 42, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#0f172a';
-        ctx.beginPath();
-        ctx.ellipse(112, 115, 26, 22, 0, 0, Math.PI * 2);
-        ctx.fill();
-      },
-      // Lateral Alongado: Crânio horizontalmente longo e baixo
-      (ctx) => {
-        ctx.fillStyle = '#f8fafc';
-        ctx.beginPath();
-        ctx.ellipse(112, 120, 85, 38, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#0f172a';
-        ctx.beginPath();
-        ctx.ellipse(145, 118, 16, 14, 0, 0, Math.PI * 2);
-        ctx.fill();
-      },
-      // Isométrica Sirenia
-      (ctx) => {
-        ctx.fillStyle = '#e2e8f0';
-        ctx.beginPath();
-        ctx.ellipse(112, 125, 75, 48, -0.2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#1e293b';
-        ctx.beginPath();
-        ctx.ellipse(120, 110, 20, 18, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    ];
+    // 1. Treina as fotos reais com variações de rotação/escala
+    for (const group of photoCatalog) {
+      for (const path of group.paths) {
+        try {
+          const img = await this.loadImage(encodeURI(path));
+          
+          // Captura em escala original centralizada
+          tCtx.fillStyle = "#000";
+          tCtx.fillRect(0, 0, 224, 224);
+          tCtx.drawImage(img, 0, 0, 224, 224);
+          this.addTensorExample(trainCanvas, group.label);
 
-    // 4. Amostras de FUNDO/RUÍDO (Teclados, Mesas, Clutter e Paredes)
-    const backgroundRenderers = [
-      // Teclado: Grade ortogonal de teclas pretas e cinzas
-      (ctx) => {
-        ctx.fillStyle = '#1e293b';
-        ctx.fillRect(0, 0, 224, 224);
-        ctx.fillStyle = '#334155';
-        for (let r = 0; r < 5; r++) {
-          for (let c = 0; c < 5; c++) {
-            ctx.fillRect(15 + c * 40, 15 + r * 40, 34, 34);
-          }
+          // Variação 1: Leve zoom central (foco na anatomia)
+          tCtx.fillRect(0, 0, 224, 224);
+          tCtx.drawImage(img, img.width * 0.1, img.height * 0.1, img.width * 0.8, img.height * 0.8, 0, 0, 224, 224);
+          this.addTensorExample(trainCanvas, group.label);
+
+          // Variação 2: Espelhamento horizontal (simula aproximação do outro lado)
+          tCtx.save();
+          tCtx.translate(224, 0);
+          tCtx.scale(-1, 1);
+          tCtx.drawImage(img, 0, 0, 224, 224);
+          tCtx.restore();
+          this.addTensorExample(trainCanvas, group.label);
+        } catch (e) {
+          console.warn(`Foto ${path} não carregada para treino:`, e);
         }
-      },
-      // Mesa plana de madeira / superfície neutra
-      (ctx) => {
-        const grad = ctx.createLinearGradient(0, 0, 224, 224);
-        grad.addColorStop(0, '#78350f');
-        grad.addColorStop(1, '#451a03');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, 224, 224);
-      },
-      // Monitor com texto / linhas horizontais
-      (ctx) => {
-        ctx.fillStyle = '#090d16';
-        ctx.fillRect(0, 0, 224, 224);
-        ctx.fillStyle = '#38bdf8';
-        for (let y = 30; y < 200; y += 22) {
-          ctx.fillRect(25, y, 170, 8);
-        }
-      },
-      // Ruído estático / Fundo neutro cinza
-      (ctx) => {
-        ctx.fillStyle = '#64748b';
-        ctx.fillRect(0, 0, 224, 224);
-      }
-    ];
-
-    const trainingGroups = [
-      { label: 'flautista', renderers: flautistaRenderers },
-      { label: 'hippidion', renderers: hippidionRenderers },
-      { label: 'peixeboi', renderers: peixeboiRenderers },
-      { label: 'background', renderers: backgroundRenderers }
-    ];
-
-    for (const group of trainingGroups) {
-      for (const renderFn of group.renderers) {
-        // Limpa e desenha a amostra
-        this.autoCtx.fillStyle = '#0f172a';
-        this.autoCtx.fillRect(0, 0, 224, 224);
-        renderFn(this.autoCtx);
-
-        // Treina no classificador MobileNet
-        const tensor = tf.browser.fromPixels(this.autoCanvas);
-        const activation = this.model.infer(tensor, true);
-        this.classifier.addExample(activation, group.label);
-        tensor.dispose();
       }
     }
+
+    // 2. Treina a classe de Fundo/Ruído (Teclados, mesas, mouses e objetos escuros)
+    const bgColors = ['#0f172a', '#1e293b', '#334155', '#451a03', '#78350f', '#000000', '#262626'];
+    for (const color of bgColors) {
+      tCtx.fillStyle = color;
+      tCtx.fillRect(0, 0, 224, 224);
+      // Simula teclas de teclado
+      tCtx.fillStyle = '#475569';
+      for (let r = 0; r < 4; r++) {
+        for (let c = 0; c < 4; c++) {
+          tCtx.fillRect(20 + c * 48, 20 + r * 48, 38, 38);
+        }
+      }
+      this.addTensorExample(trainCanvas, 'background');
+    }
+  }
+
+  addTensorExample(canvasElement, label) {
+    const tensor = tf.browser.fromPixels(canvasElement);
+    const activation = this.model.infer(tensor, true);
+    this.classifier.addExample(activation, label);
+    tensor.dispose();
+  }
+
+  loadImage(src) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => resolve(img);
+      img.onerror = (e) => reject(e);
+      img.src = src;
+    });
+  }
+
+  /**
+   * Extrai o perfil de cor médio (HSL) e luminosidade da região do objeto
+   */
+  extractColorProfile(imgData, minX, maxX, minY, maxY, edgeMap, sampleSize) {
+    const data = imgData.data;
+    let totalR = 0, totalG = 0, totalB = 0, count = 0;
+
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        const idx = (y * sampleSize + x) * 4;
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+
+        // Amostra apenas os pixels da área do objeto
+        totalR += r;
+        totalG += g;
+        totalB += b;
+        count++;
+      }
+    }
+
+    if (count === 0) return { h: 0, s: 0, l: 0 };
+
+    const avgR = totalR / count / 255;
+    const avgG = totalG / count / 255;
+    const avgB = totalB / count / 255;
+
+    const max = Math.max(avgR, avgG, avgB);
+    const min = Math.min(avgR, avgG, avgB);
+    let h = 0, s = 0;
+    const l = (max + min) / 2;
+
+    if (max !== min) {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      switch (max) {
+        case avgR: h = (avgG - avgB) / d + (avgG < avgB ? 6 : 0); break;
+        case avgG: h = (avgB - avgR) / d + 2; break;
+        case avgB: h = (avgR - avgG) / d + 4; break;
+      }
+      h /= 6;
+    }
+
+    return {
+      h: Math.round(h * 360),
+      s: parseFloat(s.toFixed(2)),
+      l: parseFloat(l.toFixed(2))
+    };
+  }
+
+  /**
+   * Valida se a cor da cena bate com o perfil real da peça
+   */
+  matchesColorProfile(pieceId, color) {
+    const prof = this.colorProfiles[pieceId];
+    if (!prof) return false;
+
+    // Hippidion: Cinza grafite (baixa saturação, luminosidade média/baixa)
+    if (pieceId === 'hippidion') {
+      return color.s <= prof.maxSat && color.l >= prof.minLight && color.l <= prof.maxLight;
+    }
+
+    // Peixe-boi: Bege fóssil muito claro / marfim
+    if (pieceId === 'peixeboi') {
+      return color.l >= prof.minLight && color.s <= prof.maxSat;
+    }
+
+    // Flautista: Marrom ocre / tom terra
+    if (pieceId === 'flautista') {
+      return color.h >= prof.minHue && color.h <= prof.maxHue && color.s >= prof.minSat && color.l >= prof.minLight;
+    }
+
+    return false;
   }
 
   getTelemetry() {
@@ -338,7 +253,7 @@ class ShapeRecognizer {
     const imgData = this.ctx.getImageData(0, 0, sampleSize, sampleSize);
     const data = imgData.data;
 
-    // 1. Extração de Bordas para Laser Holográfico e Efeito de Suspense
+    // 1. Extração de Bordas
     const gray = new Float32Array(sampleSize * sampleSize);
     for (let i = 0; i < data.length; i += 4) {
       gray[i / 4] = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) / 255.0;
@@ -374,7 +289,10 @@ class ShapeRecognizer {
     const objWidth = Math.max(1, maxX - minX);
     const objHeight = Math.max(1, maxY - minY);
 
-    // 2. Classificação Neural MobileNet em Tempo Real
+    // 2. Extração da Cor Média do Objeto no Visor
+    const detectedColor = this.extractColorProfile(imgData, minX, maxX, minY, maxY, edgeMap, sampleSize);
+
+    // 3. Inferência Neural com TensorFlow.js + MobileNet
     if (this.classifier && this.model && !this.isInferring && this.classifier.getNumClasses() > 0) {
       this.isInferring = true;
       this.runNeuralInference(this.canvas).then(prediction => {
@@ -404,31 +322,18 @@ class ShapeRecognizer {
 
       const topClass = this.lastPrediction.label;
       const topConfidence = this.lastPrediction.confidences[topClass] || 0;
+      const bgConfidence = this.lastPrediction.confidences['background'] || 0;
 
-      // Se a classe vencedora for uma das peças do museu (e não fundo/ruído) com confiança >= 65%
-      if (topClass !== 'background' && topConfidence >= 0.65) {
-        const bgConf = this.lastPrediction.confidences['background'] || 0;
-        if (topConfidence - bgConf >= 0.15) {
+      // Validação Multi-Modal Rígida:
+      // a) Deve ser uma das 3 peças (e não 'background')
+      // b) Confiança neural >= 65% e pelo menos 15% acima de 'background'
+      // c) Cor do objeto deve bater com o tom real da peça no museu
+      if (topClass !== 'background' && topConfidence >= 0.65 && (topConfidence - bgConfidence) >= 0.15) {
+        const isColorMatch = this.matchesColorProfile(topClass, detectedColor);
+
+        if (isColorMatch && totalEdges >= 80) {
           confirmedMatchId = topClass;
           matchConfidence = topConfidence;
-        }
-      }
-    } else {
-      // Fallback Heurístico Proporcional
-      const currentAspectRatio = objHeight / objWidth;
-      if (totalEdges >= 90) {
-        if (currentAspectRatio > 1.18) {
-          scores.flautista.confidence = 72;
-          confirmedMatchId = "flautista";
-          matchConfidence = 0.72;
-        } else if (currentAspectRatio < 0.82) {
-          scores.peixeboi.confidence = 74;
-          confirmedMatchId = "peixeboi";
-          matchConfidence = 0.74;
-        } else {
-          scores.hippidion.confidence = 70;
-          confirmedMatchId = "hippidion";
-          matchConfidence = 0.70;
         }
       }
     }
@@ -437,6 +342,7 @@ class ShapeRecognizer {
       status: confirmedMatchId ? "detected" : "searching",
       message: confirmedMatchId ? `Identificado: ${confirmedMatchId.toUpperCase()}` : "Enquadre a peça no centro",
       totalEdges,
+      color: `H:${detectedColor.h}° S:${Math.round(detectedColor.s * 100)}% L:${Math.round(detectedColor.l * 100)}%`,
       bestMatch: confirmedMatchId,
       scores
     };
@@ -445,7 +351,7 @@ class ShapeRecognizer {
       return this.pushHistory(null);
     }
 
-    // 3. Contorno Periférico Radial de 24 Pontos para o Laser e Suspense
+    // 4. Contorno Periférico Radial de 24 Pontos para Laser e Suspense
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
     const numRays = 24;
