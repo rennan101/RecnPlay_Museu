@@ -10,7 +10,8 @@ class ShapeRecognizer {
     this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
     this.signatures = {};
     this.history = [];
-    this.historyMaxLength = 7;
+    this.historyMaxLength = 6;
+    this.lastTelemetry = null;
   }
 
   async init() {
@@ -22,8 +23,9 @@ class ShapeRecognizer {
   setupMultiAngleReferenceSignatures() {
     /**
      * BANCO DE ASSINATURAS MULTI-ÂNGULO DOS MODELOS 3D DO ACERVO:
-     * Cada peça possui múltiplos vetores de descritores característicos (Frontal, Perfil/Lateral, Diagonal)
-     * extraídos dos modelos geométricos e texturas oficiais.
+     * 1. Flautista (Crânio): Alongamento vertical, calota craniana superior alargada (topHeavy alto).
+     * 2. Hippidion (Astrágalo): Bloco ósseo compacto e quadrado (aspectRatio ~1.0, massa equilibrada).
+     * 3. Peixe-boi (Sirenia): Formato horizontalmente largo/alongado (aspectRatio baixo, massa concentrada na base).
      */
     this.signatures = {
       flautista: {
@@ -32,33 +34,30 @@ class ShapeRecognizer {
         views: [
           // Vista 1: Frontal (Calota esférica superior, órbitas oculares simétricas, mandíbula afunilada)
           {
-            aspectRatio: 1.34,
-            topHeavy: 0.67,
-            symmetry: 0.86,
-            quadrants: [0.34, 0.33, 0.17, 0.16], // [Topo-Esq, Topo-Dir, Base-Esq, Base-Dir]
-            rowHog: [0.32, 0.36, 0.19, 0.13],
-            colHog: [0.18, 0.32, 0.32, 0.18],
-            keypointConcentration: "upper_center"
+            aspectRatio: 1.30,
+            topHeavy: 0.65,
+            symmetry: 0.85,
+            quadrants: [0.35, 0.35, 0.15, 0.15], // [Topo-Esq, Topo-Dir, Base-Esq, Base-Dir]
+            rowHog: [0.34, 0.34, 0.18, 0.14],
+            colHog: [0.20, 0.30, 0.30, 0.20]
           },
           // Vista 2: Diagonal 45° (Calota proeminente com curvatura facial contínua)
           {
-            aspectRatio: 1.22,
-            topHeavy: 0.62,
+            aspectRatio: 1.20,
+            topHeavy: 0.60,
             symmetry: 0.72,
             quadrants: [0.36, 0.28, 0.20, 0.16],
-            rowHog: [0.30, 0.34, 0.21, 0.15],
-            colHog: [0.22, 0.30, 0.28, 0.20],
-            keypointConcentration: "upper_center"
+            rowHog: [0.32, 0.32, 0.20, 0.16],
+            colHog: [0.24, 0.30, 0.28, 0.18]
           },
           // Vista 3: Perfil Lateral (Projeção nasal e calota posterior alongada)
           {
-            aspectRatio: 1.08,
+            aspectRatio: 1.12,
             topHeavy: 0.58,
-            symmetry: 0.52,
-            quadrants: [0.32, 0.26, 0.24, 0.18],
-            rowHog: [0.28, 0.30, 0.24, 0.18],
-            colHog: [0.28, 0.28, 0.24, 0.20],
-            keypointConcentration: "upper_lateral"
+            symmetry: 0.55,
+            quadrants: [0.32, 0.28, 0.22, 0.18],
+            rowHog: [0.30, 0.30, 0.22, 0.18],
+            colHog: [0.26, 0.28, 0.26, 0.20]
           }
         ]
       },
@@ -67,35 +66,32 @@ class ShapeRecognizer {
         id: "hippidion",
         name: "Hippidion (Astrágalo)",
         views: [
-          // Vista 1: Dorsal (Tróclea articular dupla com sulco central profundo)
+          // Vista 1: Dorsal (Tróclea articular dupla com proporção quadrangular)
           {
-            aspectRatio: 1.04,
+            aspectRatio: 1.02,
             topHeavy: 0.50,
-            symmetry: 0.74,
+            symmetry: 0.75,
             quadrants: [0.25, 0.25, 0.25, 0.25],
-            rowHog: [0.24, 0.26, 0.26, 0.24],
-            colHog: [0.28, 0.22, 0.22, 0.28], // Cristas nas bordas com sulco central
-            keypointConcentration: "center_split"
+            rowHog: [0.25, 0.25, 0.25, 0.25],
+            colHog: [0.27, 0.23, 0.23, 0.27]
           },
           // Vista 2: Ventral / Articular (Bloco ósseo maciço compacto)
           {
-            aspectRatio: 0.96,
-            topHeavy: 0.48,
-            symmetry: 0.62,
+            aspectRatio: 0.98,
+            topHeavy: 0.49,
+            symmetry: 0.65,
             quadrants: [0.24, 0.26, 0.25, 0.25],
-            rowHog: [0.23, 0.27, 0.27, 0.23],
-            colHog: [0.24, 0.26, 0.26, 0.24],
-            keypointConcentration: "dense_center"
+            rowHog: [0.24, 0.26, 0.26, 0.24],
+            colHog: [0.25, 0.25, 0.25, 0.25]
           },
           // Vista 3: Lateral (Corpo articular quadrangular)
           {
-            aspectRatio: 1.10,
+            aspectRatio: 1.06,
             topHeavy: 0.52,
-            symmetry: 0.58,
-            quadrants: [0.27, 0.25, 0.24, 0.24],
+            symmetry: 0.60,
+            quadrants: [0.26, 0.26, 0.24, 0.24],
             rowHog: [0.26, 0.26, 0.24, 0.24],
-            colHog: [0.25, 0.25, 0.25, 0.25],
-            keypointConcentration: "dense_center"
+            colHog: [0.25, 0.25, 0.25, 0.25]
           }
         ]
       },
@@ -107,12 +103,11 @@ class ShapeRecognizer {
           // Vista 1: Dorsal Superior (Arcos zigomáticos laterais largos e rostro anterior)
           {
             aspectRatio: 0.72,
-            topHeavy: 0.38,
+            topHeavy: 0.40,
             symmetry: 0.82,
             quadrants: [0.18, 0.18, 0.32, 0.32],
-            rowHog: [0.15, 0.23, 0.33, 0.29],
-            colHog: [0.32, 0.18, 0.18, 0.32], // Expansão extrema nos arcos laterais
-            keypointConcentration: "wide_lateral"
+            rowHog: [0.16, 0.24, 0.32, 0.28],
+            colHog: [0.30, 0.20, 0.20, 0.30]
           },
           // Vista 2: Frontal / Rostral (Focinho espesso e base alargada)
           {
@@ -120,24 +115,21 @@ class ShapeRecognizer {
             topHeavy: 0.42,
             symmetry: 0.78,
             quadrants: [0.20, 0.20, 0.30, 0.30],
-            rowHog: [0.18, 0.24, 0.31, 0.27],
-            colHog: [0.28, 0.22, 0.22, 0.28],
-            keypointConcentration: "lower_wide"
+            rowHog: [0.18, 0.24, 0.30, 0.28],
+            colHog: [0.28, 0.22, 0.22, 0.28]
           },
           // Vista 3: Lateral / Mandíbula (Alongamento horizontal da mandíbula/crânio)
           {
-            aspectRatio: 0.66,
-            topHeavy: 0.40,
-            symmetry: 0.50,
-            quadrants: [0.19, 0.21, 0.32, 0.28],
-            rowHog: [0.16, 0.24, 0.32, 0.28],
-            colHog: [0.24, 0.26, 0.26, 0.24],
-            keypointConcentration: "horizontal_spine"
+            aspectRatio: 0.68,
+            topHeavy: 0.42,
+            symmetry: 0.55,
+            quadrants: [0.20, 0.22, 0.30, 0.28],
+            rowHog: [0.18, 0.24, 0.30, 0.28],
+            colHog: [0.25, 0.25, 0.25, 0.25]
           }
         ]
       }
     };
-    this.lastTelemetry = null;
   }
 
   getTelemetry() {
@@ -168,11 +160,11 @@ class ShapeRecognizer {
       gray[i / 4] = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) / 255.0;
     }
 
-    // 2. Extração de Gradiente e Segmentação Saliente
+    // 2. Extração de Gradiente Sobel com Limiar Calibrado para Câmeras Reais
     let totalEdges = 0;
     let minX = sampleSize, maxX = 0, minY = sampleSize, maxY = 0;
     const edgeMap = new Uint8Array(sampleSize * sampleSize);
-    const orientations = new Float32Array(sampleSize * sampleSize);
+    const sobelThreshold = 0.15; // Calibrado para capturar relevos de peças 3D reais
 
     for (let y = 1; y < sampleSize - 1; y++) {
       for (let x = 1; x < sampleSize - 1; x++) {
@@ -185,9 +177,8 @@ class ShapeRecognizer {
                    +gray[idx + sampleSize - 1] + 2 * gray[idx + sampleSize] + gray[idx + sampleSize + 1];
 
         const magnitude = Math.sqrt(gx * gx + gy * gy);
-        if (magnitude > 0.32) {
+        if (magnitude > sobelThreshold) {
           edgeMap[idx] = 1;
-          orientations[idx] = Math.atan2(gy, gx);
           totalEdges++;
           if (x < minX) minX = x;
           if (x > maxX) maxX = x;
@@ -197,8 +188,8 @@ class ShapeRecognizer {
       }
     }
 
-    // Filtro de Rejeição de Ruído: Exige riqueza de relevo ósseo e dimensões mínimas
-    if (totalEdges < 300 || (maxX - minX) < 28 || (maxY - minY) < 28) {
+    // Filtro de Rejeição de Ruído: Requer dimensões mínimas no visor
+    if (totalEdges < 80 || (maxX - minX) < 18 || (maxY - minY) < 18) {
       this.lastTelemetry = {
         status: "searching",
         message: "Aponte para a peça 3D",
@@ -263,7 +254,7 @@ class ShapeRecognizer {
     const currentTopHeavy = (topSideEdges + 1) / (totalEdges + 2);
     const currentSymmetry = 1.0 - Math.abs(leftSideEdges - rightSideEdges) / (totalEdges + 1);
 
-    // 4. Comparação Vetorial Multidimensional contra o Banco Multi-Ângulo
+    // 4. Comparação Vetorial Calibrada contra o Banco Multi-Ângulo
     const scores = {};
     let bestMatchId = null;
     let lowestObjectDistance = 999;
@@ -273,38 +264,38 @@ class ShapeRecognizer {
       let minViewDist = 999;
 
       for (const view of sig.views) {
-        // Distância de Aspect Ratio
-        const dAspect = Math.abs(currentAspectRatio - view.aspectRatio) * 3.2;
+        // Distância de Proporção Dimensional (Aspect Ratio)
+        const dAspect = Math.abs(currentAspectRatio - view.aspectRatio) * 1.8;
 
-        // Distância de Top-Heavy
-        const dTop = Math.abs(currentTopHeavy - view.topHeavy) * 2.8;
+        // Distância de Distribuição Topo/Base (Top-Heavy)
+        const dTop = Math.abs(currentTopHeavy - view.topHeavy) * 1.8;
 
-        // Distância de Simetria
-        const dSym = Math.abs(currentSymmetry - view.symmetry) * 1.5;
+        // Distância de Simetria Bilateral
+        const dSym = Math.abs(currentSymmetry - view.symmetry) * 0.8;
 
         // Distância dos Quadrantes 2x2
         let dQuad = 0;
         for (let q = 0; q < 4; q++) {
           dQuad += Math.abs(currentQuadrants[q] - view.quadrants[q]);
         }
-        dQuad *= 2.6;
+        dQuad *= 1.2;
 
         // Distância HOG Linhas 4x4
         let dRow = 0;
         for (let r = 0; r < 4; r++) {
           dRow += Math.abs(currentRowHog[r] - view.rowHog[r]);
         }
-        dRow *= 2.4;
+        dRow *= 1.0;
 
         // Distância HOG Colunas 4x4
         let dCol = 0;
         for (let c = 0; c < 4; c++) {
           dCol += Math.abs(currentColHog[c] - view.colHog[c]);
         }
-        dCol *= 2.4;
+        dCol *= 1.0;
 
-        // Norma Euclidiana da Visão
-        const viewDist = Math.sqrt(
+        // Norma Euclidiana Normalizada
+        const rawDist = Math.sqrt(
           dAspect * dAspect +
           dTop * dTop +
           dSym * dSym +
@@ -313,13 +304,15 @@ class ShapeRecognizer {
           dCol * dCol
         );
 
-        if (viewDist < minViewDist) {
-          minViewDist = viewDist;
+        const normalizedDist = rawDist / 2.6;
+
+        if (normalizedDist < minViewDist) {
+          minViewDist = normalizedDist;
         }
       }
 
-      // Converte distância em porcentagem de confiança (0 a 100%)
-      const confidencePercent = Math.max(0, Math.min(100, Math.round((1 - (minViewDist / 1.85)) * 100)));
+      // Mapeamento linear para confiança percentual (0 a 100%)
+      const confidencePercent = Math.max(0, Math.min(100, Math.round((1.0 - (minViewDist / 0.82)) * 100)));
 
       scores[id] = {
         name: sig.name,
@@ -336,14 +329,14 @@ class ShapeRecognizer {
       }
     }
 
-    // 5. BLOQUEIO ESTREITO ANTI-AMBIGUIDADE:
+    // 5. BLOQUEIO ANTI-AMBIGUIDADE CALIBRADO:
     // Exige:
-    // a) Confiança >= 82%
-    // b) Distância euclidiana < 0.68
-    // c) Margem de superioridade sobre o segundo colocado >= 0.25 (25% de separação)
+    // a) Distância euclidiana < 0.55
+    // b) Confiança mínima >= 65%
+    // c) Margem de superioridade sobre o segundo colocado >= 0.08
     const bestConfidence = scores[bestMatchId] ? scores[bestMatchId].confidence : 0;
-    const isDistinctlySeparated = (secondLowestObjectDistance - lowestObjectDistance) >= 0.25;
-    const isStrictFaithfulMatch = (lowestObjectDistance < 0.68 && bestConfidence >= 82 && isDistinctlySeparated);
+    const isDistinctlySeparated = (secondLowestObjectDistance - lowestObjectDistance) >= 0.08;
+    const isStrictFaithfulMatch = (lowestObjectDistance < 0.55 && bestConfidence >= 65 && isDistinctlySeparated);
 
     this.lastTelemetry = {
       status: isStrictFaithfulMatch ? "detected" : "analyzing",
@@ -416,7 +409,7 @@ class ShapeRecognizer {
       this.history.shift();
     }
 
-    // Filtro Temporal de Estabilidade: Exige 5 confirmações idênticas consecutivas na janela
+    // Filtro Temporal de Estabilidade: Exige 3 confirmações consistentes na janela de 6 frames
     const counts = {};
     let maxId = null;
     let maxCount = 0;
@@ -432,7 +425,7 @@ class ShapeRecognizer {
       }
     }
 
-    if (maxCount >= 5 && latestValidResult) {
+    if (maxCount >= 3 && latestValidResult) {
       return {
         id: maxId,
         confidence: latestValidResult.confidence,
