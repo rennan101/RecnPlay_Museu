@@ -70,12 +70,34 @@
             <div class="progress-bar"><div id="score-peixeboi" class="progress-fill" style="width: 0%"></div></div>
             <strong id="val-peixeboi">0%</strong>
           </div>
+          <div class="score-item">
+            <span>Fundo/Ruído:</span>
+            <div class="progress-bar"><div id="score-background" class="progress-fill" style="width: 0%; background: #94a3b8;"></div></div>
+            <strong id="val-background">0%</strong>
+          </div>
         </div>
-        <div class="diag-metrics" id="diag-metrics">
-          <div>Aspect Ratio: <strong id="m-aspect">-</strong></div>
-          <div>Densidade: <strong id="m-density">-</strong></div>
-          <div>Massa Superior: <strong id="m-top">-</strong></div>
-          <div>Simetria: <strong id="m-sym">-</strong></div>
+
+        <!-- Seção de Treinamento Rápido / Calibração da Câmera -->
+        <div class="diag-calibration-section">
+          <div class="diag-calib-title">Calibrar Peças Reais (MobileNet AI)</div>
+          <div class="calib-btn-grid">
+            <button id="btn-train-flautista" class="calib-btn" title="Captura ângulo do Flautista">
+              <span>+ Flautista</span> <b id="count-flautista">(0)</b>
+            </button>
+            <button id="btn-train-hippidion" class="calib-btn" title="Captura ângulo do Hippidion">
+              <span>+ Hippidion</span> <b id="count-hippidion">(0)</b>
+            </button>
+            <button id="btn-train-peixeboi" class="calib-btn" title="Captura ângulo do Peixe-boi">
+              <span>+ Peixe-boi</span> <b id="count-peixeboi">(0)</b>
+            </button>
+            <button id="btn-train-background" class="calib-btn calib-bg" title="Captura teclado, mesa ou fundo">
+              <span>+ Fundo/Ruído</span> <b id="count-background">(0)</b>
+            </button>
+          </div>
+          <div class="calib-actions">
+            <button id="btn-clear-training" class="calib-action-btn" title="Resetar amostras">Resetar Treino</button>
+            <button id="btn-save-training" class="calib-action-btn primary" title="Salvar no navegador">Salvar Amostras</button>
+          </div>
         </div>
       </div>
     </div>
@@ -210,7 +232,12 @@
     </div>
   </div>
 
-  <!-- Scripts Vanilla Puros -->
+  <!-- TensorFlow.js e MobileNet para Reconhecimento Neural de Alta Fidelidade -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/knn-classifier@1.2.4/dist/knn-classifier.min.js"></script>
+
+  <!-- Scripts da Aplicação -->
   <script src="data.js"></script>
   <script src="recognition.js"></script>
   <script src="app.js"></script>

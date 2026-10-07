@@ -154,6 +154,47 @@ class MuseumARApp {
       });
     }
 
+    // Botões de Calibração / Treinamento de Amostras com MobileNet
+    ['flautista', 'hippidion', 'peixeboi', 'background'].forEach(label => {
+      const btn = document.getElementById(`btn-train-${label}`);
+      if (btn) {
+        btn.addEventListener('click', async () => {
+          if (this.recognizer && this.video) {
+            const count = await this.recognizer.addExample(label, this.video);
+            const countEl = document.getElementById(`count-${label}`);
+            if (countEl) countEl.textContent = `(${count})`;
+            btn.style.transform = 'scale(0.92)';
+            setTimeout(() => btn.style.transform = 'none', 120);
+          }
+        });
+      }
+    });
+
+    const clearBtn = document.getElementById('btn-clear-training');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        if (confirm("Deseja resetar todas as amostras salvas de calibração?")) {
+          if (this.recognizer) {
+            this.recognizer.clearDataset();
+            ['flautista', 'hippidion', 'peixeboi', 'background'].forEach(l => {
+              const el = document.getElementById(`count-${l}`);
+              if (el) el.textContent = '(0)';
+            });
+          }
+        }
+      });
+    }
+
+    const saveBtn = document.getElementById('btn-save-training');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', () => {
+        if (this.recognizer) {
+          this.recognizer.saveDataset();
+          alert("✓ Amostras salvas no navegador com sucesso!");
+        }
+      });
+    }
+
     // Botão de troca/reinício de câmera
     const flipBtn = document.getElementById('flip-camera-btn');
     if (flipBtn) {
@@ -327,13 +368,14 @@ class MuseumARApp {
       }
     }
 
-    if (telemetry.metrics) {
-      const elAspect = document.getElementById('m-aspect');
-      const elTop = document.getElementById('m-top');
-      const elSym = document.getElementById('m-sym');
-      if (elAspect) elAspect.textContent = telemetry.metrics.aspectRatio;
-      if (elTop) elTop.textContent = telemetry.metrics.topHeavy;
-      if (elSym) elSym.textContent = telemetry.metrics.symmetry;
+    if (this.recognizer) {
+      const counts = this.recognizer.getSampleCounts();
+      if (counts) {
+        for (const [k, v] of Object.entries(counts)) {
+          const el = document.getElementById(`count-${k}`);
+          if (el) el.textContent = `(${v})`;
+        }
+      }
     }
   }
 
