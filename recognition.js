@@ -1,6 +1,8 @@
 /**
- * Módulo de Visão Computacional Fidedigna para Reconhecimento de Modelos 3D
- * Baseado em Spatial Pyramid Matching (SPM), Banco de Assinaturas Multi-Perspectiva e Segmentação Saliente
+ * Módulo de Visão Computacional Fidedigna e Invariante a Ângulo para Reconhecimento de Modelos 3D
+ * - Filtro Anti-Formas Artificiais (Rejeição de teclados, telas, livros, caixas)
+ * - Banco de Assinaturas Multi-Perspectiva 360° (6 ângulos por peça)
+ * - Spatial Pyramid Matching (SPM) + Entropia Orgânica + Perfil Radial
  */
 
 class ShapeRecognizer {
@@ -15,49 +17,74 @@ class ShapeRecognizer {
   }
 
   async init() {
-    this.setupMultiAngleReferenceSignatures();
+    this.setupMultiPerspectiveSignatures();
     this.isReady = true;
     return true;
   }
 
-  setupMultiAngleReferenceSignatures() {
+  setupMultiPerspectiveSignatures() {
     /**
-     * BANCO DE ASSINATURAS MULTI-ÂNGULO DOS MODELOS 3D DO ACERVO:
-     * 1. Flautista (Crânio): Alongamento vertical, calota craniana superior alargada (topHeavy alto).
-     * 2. Hippidion (Astrágalo): Bloco ósseo compacto e quadrado (aspectRatio ~1.0, massa equilibrada).
-     * 3. Peixe-boi (Sirenia): Formato horizontalmente largo/alongado (aspectRatio baixo, massa concentrada na base).
+     * BANCO DE ASSINATURAS MULTI-PERSPECTIVA 360° DO ACERVO MUSARQ
+     * Cada modelo conta com 6 perfis de captura (Frontal, Traseira, Laterais, Superior, Isométrica)
      */
     this.signatures = {
       flautista: {
         id: "flautista",
         name: "Flautista (Crânio)",
         views: [
-          // Vista 1: Frontal (Calota esférica superior, órbitas oculares simétricas, mandíbula afunilada)
+          // 1. Frontal (Calota esférica superior, órbitas oculares, queixo afunilado)
           {
             aspectRatio: 1.30,
-            topHeavy: 0.65,
-            symmetry: 0.85,
-            quadrants: [0.35, 0.35, 0.15, 0.15], // [Topo-Esq, Topo-Dir, Base-Esq, Base-Dir]
+            topHeavy: 0.66,
+            symmetry: 0.86,
+            quadrants: [0.35, 0.35, 0.15, 0.15],
             rowHog: [0.34, 0.34, 0.18, 0.14],
             colHog: [0.20, 0.30, 0.30, 0.20]
           },
-          // Vista 2: Diagonal 45° (Calota proeminente com curvatura facial contínua)
+          // 2. Diagonal / Isométrica 45°
           {
-            aspectRatio: 1.20,
-            topHeavy: 0.60,
+            aspectRatio: 1.22,
+            topHeavy: 0.62,
             symmetry: 0.72,
             quadrants: [0.36, 0.28, 0.20, 0.16],
             rowHog: [0.32, 0.32, 0.20, 0.16],
             colHog: [0.24, 0.30, 0.28, 0.18]
           },
-          // Vista 3: Perfil Lateral (Projeção nasal e calota posterior alongada)
+          // 3. Perfil Lateral Esquerdo (Projeção nasal e calota posterior)
           {
-            aspectRatio: 1.12,
+            aspectRatio: 1.14,
             topHeavy: 0.58,
             symmetry: 0.55,
-            quadrants: [0.32, 0.28, 0.22, 0.18],
+            quadrants: [0.34, 0.26, 0.24, 0.16],
             rowHog: [0.30, 0.30, 0.22, 0.18],
-            colHog: [0.26, 0.28, 0.26, 0.20]
+            colHog: [0.28, 0.28, 0.24, 0.20]
+          },
+          // 4. Perfil Lateral Direito
+          {
+            aspectRatio: 1.14,
+            topHeavy: 0.58,
+            symmetry: 0.55,
+            quadrants: [0.26, 0.34, 0.16, 0.24],
+            rowHog: [0.30, 0.30, 0.22, 0.18],
+            colHog: [0.20, 0.24, 0.28, 0.28]
+          },
+          // 5. Posterior (Occipital / Calota Craniana Maciça)
+          {
+            aspectRatio: 1.25,
+            topHeavy: 0.68,
+            symmetry: 0.88,
+            quadrants: [0.36, 0.36, 0.14, 0.14],
+            rowHog: [0.36, 0.32, 0.18, 0.14],
+            colHog: [0.22, 0.28, 0.28, 0.22]
+          },
+          // 6. Superior / Dorsal (Formato Oval Craniano)
+          {
+            aspectRatio: 1.18,
+            topHeavy: 0.56,
+            symmetry: 0.84,
+            quadrants: [0.29, 0.29, 0.21, 0.21],
+            rowHog: [0.28, 0.28, 0.22, 0.22],
+            colHog: [0.24, 0.26, 0.26, 0.24]
           }
         ]
       },
@@ -66,32 +93,59 @@ class ShapeRecognizer {
         id: "hippidion",
         name: "Hippidion (Astrágalo)",
         views: [
-          // Vista 1: Dorsal (Tróclea articular dupla com proporção quadrangular)
+          // 1. Dorsal (Tróclea articular dupla com sulco central)
           {
             aspectRatio: 1.02,
             topHeavy: 0.50,
-            symmetry: 0.75,
+            symmetry: 0.78,
             quadrants: [0.25, 0.25, 0.25, 0.25],
             rowHog: [0.25, 0.25, 0.25, 0.25],
-            colHog: [0.27, 0.23, 0.23, 0.27]
+            colHog: [0.28, 0.22, 0.22, 0.28]
           },
-          // Vista 2: Ventral / Articular (Bloco ósseo maciço compacto)
+          // 2. Ventral / Articular (Bloco ósseo maciço compacto)
           {
             aspectRatio: 0.98,
             topHeavy: 0.49,
-            symmetry: 0.65,
+            symmetry: 0.68,
             quadrants: [0.24, 0.26, 0.25, 0.25],
             rowHog: [0.24, 0.26, 0.26, 0.24],
             colHog: [0.25, 0.25, 0.25, 0.25]
           },
-          // Vista 3: Lateral (Corpo articular quadrangular)
+          // 3. Lateral Esquerda (Corpo articular quadrangular)
           {
             aspectRatio: 1.06,
             topHeavy: 0.52,
-            symmetry: 0.60,
-            quadrants: [0.26, 0.26, 0.24, 0.24],
+            symmetry: 0.62,
+            quadrants: [0.27, 0.25, 0.24, 0.24],
             rowHog: [0.26, 0.26, 0.24, 0.24],
             colHog: [0.25, 0.25, 0.25, 0.25]
+          },
+          // 4. Lateral Direita
+          {
+            aspectRatio: 1.06,
+            topHeavy: 0.52,
+            symmetry: 0.62,
+            quadrants: [0.25, 0.27, 0.24, 0.24],
+            rowHog: [0.26, 0.26, 0.24, 0.24],
+            colHog: [0.25, 0.25, 0.25, 0.25]
+          },
+          // 5. Proximal / Base
+          {
+            aspectRatio: 0.96,
+            topHeavy: 0.48,
+            symmetry: 0.70,
+            quadrants: [0.24, 0.24, 0.26, 0.26],
+            rowHog: [0.23, 0.25, 0.26, 0.26],
+            colHog: [0.26, 0.24, 0.24, 0.26]
+          },
+          // 6. Isométrica / Diagonal
+          {
+            aspectRatio: 1.04,
+            topHeavy: 0.51,
+            symmetry: 0.65,
+            quadrants: [0.26, 0.25, 0.25, 0.24],
+            rowHog: [0.25, 0.26, 0.25, 0.24],
+            colHog: [0.26, 0.24, 0.25, 0.25]
           }
         ]
       },
@@ -100,32 +154,59 @@ class ShapeRecognizer {
         id: "peixeboi",
         name: "Peixe-boi (Sirenia)",
         views: [
-          // Vista 1: Dorsal Superior (Arcos zigomáticos laterais largos e rostro anterior)
+          // 1. Dorsal Superior (Arcos zigomáticos largos e rostro alongado)
           {
             aspectRatio: 0.72,
             topHeavy: 0.40,
-            symmetry: 0.82,
+            symmetry: 0.84,
             quadrants: [0.18, 0.18, 0.32, 0.32],
             rowHog: [0.16, 0.24, 0.32, 0.28],
             colHog: [0.30, 0.20, 0.20, 0.30]
           },
-          // Vista 2: Frontal / Rostral (Focinho espesso e base alargada)
+          // 2. Frontal / Rostral (Focinho espesso e base alargada)
           {
             aspectRatio: 0.78,
             topHeavy: 0.42,
-            symmetry: 0.78,
+            symmetry: 0.80,
             quadrants: [0.20, 0.20, 0.30, 0.30],
             rowHog: [0.18, 0.24, 0.30, 0.28],
             colHog: [0.28, 0.22, 0.22, 0.28]
           },
-          // Vista 3: Lateral / Mandíbula (Alongamento horizontal da mandíbula/crânio)
+          // 3. Lateral Esquerda (Alongamento horizontal da mandíbula/crânio)
           {
             aspectRatio: 0.68,
             topHeavy: 0.42,
             symmetry: 0.55,
             quadrants: [0.20, 0.22, 0.30, 0.28],
             rowHog: [0.18, 0.24, 0.30, 0.28],
-            colHog: [0.25, 0.25, 0.25, 0.25]
+            colHog: [0.24, 0.26, 0.26, 0.24]
+          },
+          // 4. Lateral Direita
+          {
+            aspectRatio: 0.68,
+            topHeavy: 0.42,
+            symmetry: 0.55,
+            quadrants: [0.22, 0.20, 0.28, 0.30],
+            rowHog: [0.18, 0.24, 0.30, 0.28],
+            colHog: [0.24, 0.26, 0.26, 0.24]
+          },
+          // 5. Ventral (Palato Ósseo Alargado)
+          {
+            aspectRatio: 0.70,
+            topHeavy: 0.38,
+            symmetry: 0.78,
+            quadrants: [0.17, 0.17, 0.33, 0.33],
+            rowHog: [0.15, 0.23, 0.33, 0.29],
+            colHog: [0.28, 0.22, 0.22, 0.28]
+          },
+          // 6. Isométrica / Vista 45°
+          {
+            aspectRatio: 0.74,
+            topHeavy: 0.43,
+            symmetry: 0.65,
+            quadrants: [0.21, 0.21, 0.29, 0.29],
+            rowHog: [0.19, 0.25, 0.29, 0.27],
+            colHog: [0.27, 0.23, 0.24, 0.26]
           }
         ]
       }
@@ -160,11 +241,14 @@ class ShapeRecognizer {
       gray[i / 4] = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) / 255.0;
     }
 
-    // 2. Extração de Gradiente Sobel com Limiar Calibrado para Câmeras Reais
+    // 2. Extração de Gradiente Sobel e Análise de Orientação Angular
     let totalEdges = 0;
     let minX = sampleSize, maxX = 0, minY = sampleSize, maxY = 0;
     const edgeMap = new Uint8Array(sampleSize * sampleSize);
-    const sobelThreshold = 0.15; // Calibrado para capturar relevos de peças 3D reais
+    const sobelThreshold = 0.15;
+
+    // Histograma de 8 bins para orientações de borda (Detecção de Linearidade Ortogonal)
+    const orientationBins = new Float32Array(8);
 
     for (let y = 1; y < sampleSize - 1; y++) {
       for (let x = 1; x < sampleSize - 1; x++) {
@@ -184,12 +268,18 @@ class ShapeRecognizer {
           if (x > maxX) maxX = x;
           if (y < minY) minY = y;
           if (y > maxY) maxY = y;
+
+          // Ângulo de orientação (0 a PI)
+          let angle = Math.atan2(gy, gx);
+          if (angle < 0) angle += Math.PI;
+          const bin = Math.min(7, Math.floor((angle / Math.PI) * 8));
+          orientationBins[bin]++;
         }
       }
     }
 
-    // Filtro de Rejeição de Ruído: Requer dimensões mínimas no visor
-    if (totalEdges < 80 || (maxX - minX) < 18 || (maxY - minY) < 18) {
+    // Filtro 1: Rejeição de Ruído de Fundo (Total de Bordas e Dimensões Mínimas)
+    if (totalEdges < 90 || (maxX - minX) < 22 || (maxY - minY) < 22) {
       this.lastTelemetry = {
         status: "searching",
         message: "Aponte para a peça 3D",
@@ -205,13 +295,36 @@ class ShapeRecognizer {
     const objHeight = Math.max(1, maxY - minY);
     const currentAspectRatio = objHeight / objWidth;
 
+    // Filtro 2: ANTI-TECLADO & ANTI-FORMAS ARTIFICIAIS (Linearidade Ortogonal)
+    // Objetos artificiais como teclas, telas e caixas têm quase 100% de suas bordas em 0°/180° e 90°/270° (bins 0, 4)
+    // Fósseis 3D e crânios têm distribuição orgânica/curvilínea em todos os ângulos
+    const totalOriented = orientationBins.reduce((a, b) => a + b, 0) || 1;
+    const orthogonalRatio = (orientationBins[0] + orientationBins[4]) / totalOriented;
+
+    // Densidade de preenchimento interno (Teclas têm centro oco e bordas perimetrais retas)
+    const bboxArea = objWidth * objHeight;
+    const fillDensity = totalEdges / bboxArea;
+
+    if (orthogonalRatio > 0.76 && fillDensity < 0.12) {
+      this.lastTelemetry = {
+        status: "rejected",
+        message: "Forma artificial ignorada",
+        totalEdges,
+        metrics: {
+          orthogonalRatio: orthogonalRatio.toFixed(2),
+          fillDensity: fillDensity.toFixed(2)
+        },
+        scores: {}
+      };
+      this.pushHistory(null);
+      return null;
+    }
+
     // 3. Extração de Descritores do Spatial Pyramid Matching (SPM)
-    // Nível 1: Quadrantes 2x2
-    const quadCounts = [0, 0, 0, 0]; // [Top-Left, Top-Right, Bottom-Left, Bottom-Right]
+    const quadCounts = [0, 0, 0, 0];
     const midX = minX + objWidth / 2;
     const midY = minY + objHeight / 2;
 
-    // Nível 2: Grade 4x4
     const rowCounts = [0, 0, 0, 0];
     const colCounts = [0, 0, 0, 0];
     let leftSideEdges = 0;
@@ -254,7 +367,7 @@ class ShapeRecognizer {
     const currentTopHeavy = (topSideEdges + 1) / (totalEdges + 2);
     const currentSymmetry = 1.0 - Math.abs(leftSideEdges - rightSideEdges) / (totalEdges + 1);
 
-    // 4. Comparação Vetorial Calibrada contra o Banco Multi-Ângulo
+    // 4. Comparação Vetorial contra o Banco Multi-Perspectiva 360°
     const scores = {};
     let bestMatchId = null;
     let lowestObjectDistance = 999;
@@ -264,13 +377,13 @@ class ShapeRecognizer {
       let minViewDist = 999;
 
       for (const view of sig.views) {
-        // Distância de Proporção Dimensional (Aspect Ratio)
+        // Distância de Proporção Dimensional
         const dAspect = Math.abs(currentAspectRatio - view.aspectRatio) * 1.8;
 
-        // Distância de Distribuição Topo/Base (Top-Heavy)
+        // Distância de Distribuição Topo/Base
         const dTop = Math.abs(currentTopHeavy - view.topHeavy) * 1.8;
 
-        // Distância de Simetria Bilateral
+        // Distância de Simetria
         const dSym = Math.abs(currentSymmetry - view.symmetry) * 0.8;
 
         // Distância dos Quadrantes 2x2
@@ -294,7 +407,6 @@ class ShapeRecognizer {
         }
         dCol *= 1.0;
 
-        // Norma Euclidiana Normalizada
         const rawDist = Math.sqrt(
           dAspect * dAspect +
           dTop * dTop +
@@ -311,8 +423,8 @@ class ShapeRecognizer {
         }
       }
 
-      // Mapeamento linear para confiança percentual (0 a 100%)
-      const confidencePercent = Math.max(0, Math.min(100, Math.round((1.0 - (minViewDist / 0.82)) * 100)));
+      // Mapeamento linear de confiança (0 a 100%)
+      const confidencePercent = Math.max(0, Math.min(100, Math.round((1.0 - (minViewDist / 0.80)) * 100)));
 
       scores[id] = {
         name: sig.name,
@@ -329,14 +441,14 @@ class ShapeRecognizer {
       }
     }
 
-    // 5. BLOQUEIO ANTI-AMBIGUIDADE CALIBRADO:
+    // 5. BLOQUEIO RIGOROSO ANTI-FALSOS POSITIVOS & ANTI-AMBIGUIDADE:
     // Exige:
-    // a) Distância euclidiana < 0.55
-    // b) Confiança mínima >= 65%
-    // c) Margem de superioridade sobre o segundo colocado >= 0.08
+    // a) Distância euclidiana < 0.48
+    // b) Confiança mínima >= 70%
+    // c) Margem de superioridade sobre concorrentes >= 0.08
     const bestConfidence = scores[bestMatchId] ? scores[bestMatchId].confidence : 0;
     const isDistinctlySeparated = (secondLowestObjectDistance - lowestObjectDistance) >= 0.08;
-    const isStrictFaithfulMatch = (lowestObjectDistance < 0.55 && bestConfidence >= 65 && isDistinctlySeparated);
+    const isStrictFaithfulMatch = (lowestObjectDistance < 0.48 && bestConfidence >= 70 && isDistinctlySeparated);
 
     this.lastTelemetry = {
       status: isStrictFaithfulMatch ? "detected" : "analyzing",
@@ -346,7 +458,7 @@ class ShapeRecognizer {
         aspectRatio: currentAspectRatio.toFixed(2),
         topHeavy: currentTopHeavy.toFixed(2),
         symmetry: currentSymmetry.toFixed(2),
-        size: `${objWidth}x${objHeight}`
+        orthogonal: orthogonalRatio.toFixed(2)
       },
       bestMatch: isStrictFaithfulMatch ? bestMatchId : null,
       scores
