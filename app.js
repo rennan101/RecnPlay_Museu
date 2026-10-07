@@ -6,23 +6,40 @@ class MuseumARApp {
   constructor() {
     this.video = document.getElementById('video');
     this.overlayCanvas = document.getElementById('overlay-canvas');
-    this.ctx = this.overlayCanvas.getContext('2d');
+    this.ctx = this.overlayCanvas ? this.overlayCanvas.getContext('2d') : null;
     this.hudViewfinder = document.getElementById('hud-viewfinder');
     this.hudStatus = document.getElementById('hud-status');
-    this.cardContainer = document.getElementById('floating-card-container');
+    
+    // Modal em Tela Cheia
+    this.objectModal = document.getElementById('object-fullscreen-modal');
+    this.closeObjectModalBtn = document.getElementById('close-object-modal');
+    this.backToCameraBtn = document.getElementById('back-to-camera-btn');
+    
+    // Player de Áudio
     this.audioBtn = document.getElementById('audio-play-btn');
+    this.audioPlayIcon = document.getElementById('audio-icon-play');
+    this.audioPauseIcon = document.getElementById('audio-icon-pause');
+    this.audioBtnLabel = document.getElementById('audio-btn-label');
+    this.audioBtnStatus = document.getElementById('audio-btn-status');
+    this.audioSoundWave = document.getElementById('audio-sound-wave');
+    
+    // Diagnóstico
     this.diagBtn = document.getElementById('diag-btn');
     this.diagPanel = document.getElementById('diag-panel');
     this.isDiagVisible = false;
     
+    // Reconhecimento
     this.recognizer = new ShapeRecognizer();
     this.currentItemId = null;
+    this.isObjectModalOpen = false;
+    this.detectionCooldown = 0;
+    
+    // Áudio
     this.isAudioPlaying = false;
     this.currentAudio = null;
-    this.isAudioPlaying = false;
-    this.lastDetectionTime = 0;
-    this.detectionTimeout = 2800; // Tempo em ms para manter o card visível
-    this.currentBBox = null;
+    this.speechUtterance = null;
+    
+    // Métricas
     this.frameCount = 0;
     this.lastFpsTime = performance.now();
     this.currentFps = 0;
@@ -47,12 +64,38 @@ class MuseumARApp {
       });
     }
 
-    // Botão de Áudio Local
+    // Botão de Áudio
     if (this.audioBtn) {
       this.audioBtn.addEventListener('click', () => {
         this.toggleAudio();
       });
     }
+
+    // Fechamento do Modal em Tela Cheia
+    if (this.closeObjectModalBtn) {
+      this.closeObjectModalBtn.addEventListener('click', () => {
+        this.closeObjectModal();
+      });
+    }
+
+    if (this.backToCameraBtn) {
+      this.backToCameraBtn.addEventListener('click', () => {
+        this.closeObjectModal();
+      });
+    }
+
+    // Fechar ao pressionar tecla Escape
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (this.isObjectModalOpen) {
+          this.closeObjectModal();
+        }
+        const helpModal = document.getElementById('help-modal');
+        if (helpModal && helpModal.classList.contains('active')) {
+          helpModal.classList.remove('active');
+        }
+      }
+    });
 
     // Modal de Créditos Institucionais
     const helpBtn = document.getElementById('help-btn');
@@ -64,6 +107,13 @@ class MuseumARApp {
     }
     if (closeHelp && helpModal) {
       closeHelp.addEventListener('click', () => helpModal.classList.remove('active'));
+    }
+    if (helpModal) {
+      helpModal.addEventListener('click', (e) => {
+        if (e.target === helpModal) {
+          helpModal.classList.remove('active');
+        }
+      });
     }
 
     // Botão de troca/reinício de câmera
@@ -127,6 +177,12 @@ class MuseumARApp {
         if (fpsEl) fpsEl.textContent = `${this.currentFps} FPS`;
       }
 
+      // Se o modal estiver aberto em tela cheia, pausamos a detecção contínua para economizar CPU
+      if (this.isObjectModalOpen) {
+        requestAnimationFrame(loop);
+        return;
+      }
+
       if (this.video.readyState === this.video.HAVE_ENOUGH_DATA) {
         const detection = this.recognizer.processFrame(this.video);
         const now = Date.now();
@@ -135,21 +191,14 @@ class MuseumARApp {
           this.updateDiagTelemetry();
         }
 
-        if (detection && detection.id) {
-          this.lastDetectionTime = now;
-          this.currentBBox = detection.bbox;
-          this.currentContour = detection.contour;
-          this.showCard(detection.id, detection.bbox);
-          this.hudViewfinder.classList.add('detected');
+        // Se houver detecção e não estivermos no período de cooldown após fechar
+        if (detection && detection.id && now > this.detectionCooldown) {
           this.drawTargetHUD(true, detection.bbox, detection.contour);
+          this.hudViewfinder.classList.add('detected');
+          this.showObjectModal(detection.id, detection.bbox, detection.contour);
         } else {
-          if (now - this.lastDetectionTime > this.detectionTimeout) {
-            this.hideCard();
-            this.hudViewfinder.classList.remove('detected');
-            this.drawTargetHUD(false);
-          } else if (this.currentBBox) {
-            this.drawTargetHUD(true, this.currentBBox, this.currentContour);
-          }
+          this.hudViewfinder.classList.remove('detected');
+          this.drawTargetHUD(false);
         }
       }
       requestAnimationFrame(loop);
@@ -176,14 +225,19 @@ class MuseumARApp {
     }
 
     if (telemetry.metrics) {
-      document.getElementById('m-aspect').textContent = telemetry.metrics.aspectRatio;
-      document.getElementById('m-density').textContent = telemetry.metrics.edgeDensity;
-      document.getElementById('m-top').textContent = telemetry.metrics.topHeavy;
-      document.getElementById('m-sym').textContent = telemetry.metrics.symmetry;
+      const elAspect = document.getElementById('m-aspect');
+      const elDensity = document.getElementById('m-density');
+      const elTop = document.getElementById('m-top');
+      const elSym = document.getElementById('m-sym');
+      if (elAspect) elAspect.textContent = telemetry.metrics.aspectRatio;
+      if (elDensity) elDensity.textContent = telemetry.metrics.edgeDensity;
+      if (elTop) elTop.textContent = telemetry.metrics.topHeavy;
+      if (elSym) elSym.textContent = telemetry.metrics.symmetry;
     }
   }
 
   drawTargetHUD(isDetected, bbox, contour) {
+    if (!this.ctx || !this.overlayCanvas) return;
     this.ctx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
     if (!isDetected) return;
 
@@ -195,12 +249,9 @@ class MuseumARApp {
     const originX = (screenW - sDim) / 2;
     const originY = (screenH - sDim) / 2;
 
-    const cx = screenW / 2;
-    const cy = screenH / 2;
-
     this.ctx.save();
 
-    // 1. DESENHO DO CONTORNO GROSSO E BRANCO AO REDOR DO OBJETO REAL
+    // Desenho do contorno branco ao redor do objeto
     if (contour && contour.length > 2) {
       this.ctx.beginPath();
       const firstX = originX + contour[0].x * sDim;
@@ -214,113 +265,109 @@ class MuseumARApp {
       }
       this.ctx.closePath();
 
-      // Configuração do Contorno Grosso e Branco com Brilho
       this.ctx.strokeStyle = "#FFFFFF";
-      this.ctx.lineWidth = 7;
+      this.ctx.lineWidth = 6;
       this.ctx.lineCap = "round";
       this.ctx.lineJoin = "round";
       this.ctx.shadowColor = "rgba(255, 255, 255, 0.9)";
       this.ctx.shadowBlur = 14;
       this.ctx.stroke();
 
-      // Preenchimento sutil translúcido para destacar o objeto
-      this.ctx.fillStyle = "rgba(255, 255, 255, 0.06)";
+      this.ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
       this.ctx.fill();
-    }
-
-    // 2. LINHA DE CONEXÃO AR ENTRE O CONTORNO BRANCO E O CARD DE TEXTO
-    if (this.cardContainer.classList.contains('visible')) {
-      const cardRect = this.cardContainer.getBoundingClientRect();
-      const targetAnchorX = (cardRect.left + cardRect.width / 2 < cx) ? cardRect.right : cardRect.left;
-      const targetAnchorY = cardRect.top + cardRect.height / 2;
-
-      this.ctx.strokeStyle = "#FFFFFF";
-      this.ctx.lineWidth = 3;
-      this.ctx.setLineDash([5, 5]);
-      this.ctx.shadowColor = "rgba(255, 255, 255, 0.8)";
-      this.ctx.shadowBlur = 8;
-      
-      this.ctx.beginPath();
-      this.ctx.moveTo(cx, cy);
-      this.ctx.lineTo(targetAnchorX, targetAnchorY);
-      this.ctx.stroke();
     }
 
     this.ctx.restore();
   }
 
-  showCard(itemId, bbox) {
+  showObjectModal(itemId, bbox, contour) {
     const data = MUSEUM_ITEMS[itemId];
     if (!data) return;
 
-    // Posiciona o card espacialmente ao lado do objeto na Realidade Aumentada
-    this.positionCardSpatial(bbox);
-
-    if (this.currentItemId === itemId && this.cardContainer.classList.contains('visible')) {
-      return;
-    }
-
     this.currentItemId = itemId;
+    this.isObjectModalOpen = true;
 
-    // Preenche o Card
-    document.getElementById('card-badge').textContent = data.category;
-    document.getElementById('card-badge').style.borderColor = data.badgeColor;
-    document.getElementById('card-badge').style.color = data.badgeColor;
-    
-    document.getElementById('card-title').textContent = data.title;
-    document.getElementById('card-subtitle').textContent = data.subtitle;
-    document.getElementById('card-description').innerText = data.fullText;
+    // Preenche os dados no modal
+    const badgeEl = document.getElementById('card-badge');
+    if (badgeEl) {
+      badgeEl.textContent = data.category;
+      badgeEl.style.borderColor = data.badgeColor || '#06b6d4';
+      badgeEl.style.color = data.badgeColor || '#06b6d4';
+    }
 
-    // Fatos Rápidos
+    const titleEl = document.getElementById('card-title');
+    if (titleEl) titleEl.textContent = data.title;
+
+    const subtitleEl = document.getElementById('card-subtitle');
+    if (subtitleEl) subtitleEl.textContent = data.subtitle;
+
+    const descEl = document.getElementById('card-description');
+    if (descEl) descEl.innerText = data.fullText;
+
+    // Fatos Técnicos
     const factsContainer = document.getElementById('card-facts');
-    factsContainer.innerHTML = '';
-    data.facts.forEach(fact => {
-      const item = document.createElement('div');
-      item.className = 'fact-item';
-      item.innerHTML = `
-        <div class="fact-label">${fact.label}</div>
-        <div class="fact-value">${fact.value}</div>
-      `;
-      factsContainer.appendChild(item);
-    });
+    if (factsContainer) {
+      factsContainer.innerHTML = '';
+      if (Array.isArray(data.facts)) {
+        data.facts.forEach(fact => {
+          const item = document.createElement('div');
+          item.className = 'fact-item';
+          item.innerHTML = `
+            <div class="fact-label">${fact.label}</div>
+            <div class="fact-value">${fact.value}</div>
+          `;
+          factsContainer.appendChild(item);
+        });
+      }
+    }
 
-    this.cardContainer.classList.add('visible');
+    // Reseta estado do botão de áudio
+    this.resetAudioUI();
+
+    // Abre o modal em tela cheia
+    if (this.objectModal) {
+      this.objectModal.classList.add('active');
+    }
+
     this.hudStatus.textContent = `Identificado: ${data.title}`;
+  }
 
-    if (this.isAudioPlaying) {
-      this.stopAudio();
+  closeObjectModal() {
+    this.isObjectModalOpen = false;
+    this.detectionCooldown = Date.now() + 1800; // 1.8 segundos de pausa antes de re-escanear
+
+    this.stopAudio();
+
+    if (this.objectModal) {
+      this.objectModal.classList.remove('active');
+    }
+
+    this.hudStatus.textContent = "Aponte a câmera para uma peça 3D";
+    if (this.hudViewfinder) {
+      this.hudViewfinder.classList.remove('detected');
+    }
+
+    if (this.ctx && this.overlayCanvas) {
+      this.ctx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
     }
   }
 
-  positionCardSpatial(bbox) {
-    const screenW = window.innerWidth;
-    const screenH = window.innerHeight;
-    const cardW = Math.min(screenW * 0.88, 380);
-
-    if (screenW > 768) {
-      const left = Math.min(screenW - cardW - 24, (screenW / 2) + 140);
-      const top = Math.max(80, (screenH / 2) - 180);
-      this.cardContainer.style.left = `${left}px`;
-      this.cardContainer.style.top = `${top}px`;
-      this.cardContainer.style.right = 'auto';
-      this.cardContainer.style.bottom = 'auto';
-    } else {
-      const top = Math.min(screenH - 300, (screenH / 2) + (Math.min(screenW, screenH) * 0.38) + 10);
-      const left = (screenW - cardW) / 2;
-      this.cardContainer.style.left = `${left}px`;
-      this.cardContainer.style.top = `${top}px`;
-      this.cardContainer.style.right = 'auto';
-      this.cardContainer.style.bottom = 'auto';
-    }
+  resetAudioUI() {
+    this.isAudioPlaying = false;
+    if (this.audioBtn) this.audioBtn.classList.remove('playing');
+    if (this.audioPlayIcon) this.audioPlayIcon.style.display = 'block';
+    if (this.audioPauseIcon) this.audioPauseIcon.style.display = 'none';
+    if (this.audioBtnLabel) this.audioBtnLabel.textContent = 'Ouvir Narração da Peça';
+    if (this.audioBtnStatus) this.audioBtnStatus.textContent = 'Clique para reproduzir o áudio explicativo';
   }
 
-  hideCard() {
-    this.cardContainer.classList.remove('visible');
-    this.currentItemId = null;
-    this.hudStatus.textContent = "Aponte a câmera para uma peça";
-    if (this.isAudioPlaying) {
-      this.stopAudio();
-    }
+  setAudioPlayingUI() {
+    this.isAudioPlaying = true;
+    if (this.audioBtn) this.audioBtn.classList.add('playing');
+    if (this.audioPlayIcon) this.audioPlayIcon.style.display = 'none';
+    if (this.audioPauseIcon) this.audioPauseIcon.style.display = 'block';
+    if (this.audioBtnLabel) this.audioBtnLabel.textContent = 'Pausar Narração';
+    if (this.audioBtnStatus) this.audioBtnStatus.textContent = 'Reproduzindo áudio explicativo...';
   }
 
   toggleAudio() {
@@ -337,33 +384,56 @@ class MuseumARApp {
     }
 
     this.stopAudio();
-
     const data = MUSEUM_ITEMS[this.currentItemId];
-    if (!data.audioUrl) return;
 
-    this.currentAudio = new Audio(data.audioUrl);
+    this.setAudioPlayingUI();
 
-    this.currentAudio.onplay = () => {
-      this.isAudioPlaying = true;
-      if (this.audioBtn) this.audioBtn.classList.add('playing');
+    // 1. Tentativa de reprodução via arquivo de áudio
+    if (data.audioUrl) {
+      this.currentAudio = new Audio(data.audioUrl);
+
+      this.currentAudio.onended = () => {
+        this.resetAudioUI();
+      };
+
+      this.currentAudio.onerror = (e) => {
+        console.warn("Erro ao reproduzir arquivo de áudio. Utilizando síntese de voz nativa...", e);
+        this.fallbackSpeechSynthesis(data.fullText);
+      };
+
+      const playPromise = this.currentAudio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn("Autoplay bloqueado ou falha no arquivo. Utilizando síntese de voz nativa:", err);
+          this.fallbackSpeechSynthesis(data.fullText);
+        });
+      }
+    } else {
+      this.fallbackSpeechSynthesis(data.fullText);
+    }
+  }
+
+  fallbackSpeechSynthesis(text) {
+    if (!('speechSynthesis' in window)) {
+      this.resetAudioUI();
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    this.speechUtterance = new SpeechSynthesisUtterance(text);
+    this.speechUtterance.lang = 'pt-BR';
+    this.speechUtterance.rate = 1.0;
+    this.speechUtterance.pitch = 1.0;
+
+    this.speechUtterance.onend = () => {
+      this.resetAudioUI();
     };
 
-    this.currentAudio.onended = () => {
-      this.isAudioPlaying = false;
-      if (this.audioBtn) this.audioBtn.classList.remove('playing');
+    this.speechUtterance.onerror = () => {
+      this.resetAudioUI();
     };
 
-    this.currentAudio.onerror = (e) => {
-      console.error("Erro ao carregar arquivo de áudio:", e);
-      this.isAudioPlaying = false;
-      if (this.audioBtn) this.audioBtn.classList.remove('playing');
-    };
-
-    this.currentAudio.play().catch(err => {
-      console.warn("Autoplay bloqueado ou erro ao tocar áudio:", err);
-      this.isAudioPlaying = false;
-      if (this.audioBtn) this.audioBtn.classList.remove('playing');
-    });
+    window.speechSynthesis.speak(this.speechUtterance);
   }
 
   stopAudio() {
@@ -372,10 +442,13 @@ class MuseumARApp {
       this.currentAudio.currentTime = 0;
       this.currentAudio = null;
     }
-    this.isAudioPlaying = false;
-    if (this.audioBtn) {
-      this.audioBtn.classList.remove('playing');
+
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
     }
+
+    this.speechUtterance = null;
+    this.resetAudioUI();
   }
 }
 

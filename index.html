@@ -94,27 +94,71 @@
       <div id="hud-status" class="hud-label">Iniciando câmera...</div>
     </div>
 
-    <!-- Card de Informação Flutuante Ancorado (Rolável) -->
-    <div id="floating-card-container">
-      <div class="info-card">
-        <div class="card-header">
-          <div>
+    <!-- Card de Informação em Tela Cheia (Aparece no Reconhecimento e Fecha pelo Usuário) -->
+    <div id="object-fullscreen-modal" class="fullscreen-modal-overlay">
+      <div class="fullscreen-modal-content">
+        <header class="fullscreen-modal-header">
+          <div class="header-badge-wrap">
             <span id="card-badge" class="badge-tag">Arqueologia</span>
-            <h2 id="card-title" class="card-title">Flautista</h2>
-            <div id="card-subtitle" class="card-subtitle">Homem pré-histórico</div>
           </div>
-          <button id="audio-play-btn" class="card-audio-btn" title="Ouvir Narração">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          <button id="close-object-modal" class="modal-close-icon-btn" title="Fechar e Voltar para a Câmera">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
           </button>
+        </header>
+
+        <div class="fullscreen-modal-body">
+          <div class="object-hero-section">
+            <h1 id="card-title" class="object-title">Flautista</h1>
+            <div id="card-subtitle" class="object-subtitle">Homem pré-histórico</div>
+          </div>
+
+          <!-- Player de Narração em Áudio -->
+          <div class="audio-player-banner">
+            <button id="audio-play-btn" class="audio-banner-btn" title="Ouvir Narração">
+              <div class="audio-btn-icon-wrapper">
+                <svg id="audio-icon-play" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+                <svg id="audio-icon-pause" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" style="display: none;">
+                  <rect x="6" y="4" width="4" height="16"></rect>
+                  <rect x="14" y="4" width="4" height="16"></rect>
+                </svg>
+              </div>
+              <div class="audio-btn-labels">
+                <span id="audio-btn-label" class="audio-btn-title">Ouvir Narração da Peça</span>
+                <span id="audio-btn-status" class="audio-btn-sub">Clique para reproduzir o áudio explicativo</span>
+              </div>
+              <div class="audio-sound-wave" id="audio-sound-wave">
+                <span></span><span></span><span></span><span></span>
+              </div>
+            </button>
+          </div>
+
+          <!-- Descrição Completa -->
+          <div class="object-section">
+            <h3 class="section-heading">Sobre a Peça</h3>
+            <p id="card-description" class="object-description"></p>
+          </div>
+
+          <!-- Fatos e Ficha Técnica -->
+          <div class="object-section">
+            <h3 class="section-heading">Ficha Técnica</h3>
+            <div id="card-facts" class="card-facts"></div>
+          </div>
         </div>
 
-        <div class="card-body scrollable-card-body">
-          <p id="card-description" class="card-description"></p>
-          <div id="card-facts" class="card-facts"></div>
-        </div>
+        <footer class="fullscreen-modal-footer">
+          <button id="back-to-camera-btn" class="back-camera-action-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+              <circle cx="12" cy="13" r="4"></circle>
+            </svg>
+            <span>Voltar para a Câmera</span>
+          </button>
+        </footer>
       </div>
     </div>
 
@@ -129,22 +173,24 @@
           <p class="credits-intro">Aplicação de Realidade Aumentada desenvolvida para o acervo e experiência interativa do Museu.</p>
           
           <div class="credits-grid">
+            <!-- Topo: Museu e AmanaLab -->
             <div class="credit-logo-card">
-              <img src="assets/logo/MUSARQ_Logo.svg" alt="MUSARQ" class="credit-logo-img">
-            </div>
-            <div class="credit-logo-card">
-              <img src="assets/logo/Unicap.svg" alt="UNICAP" class="credit-logo-img">
+              <img src="assets/logo/MUSARQ_Logo.svg" alt="Museu de Arqueologia e Ciências Naturais - MUSARQ" class="credit-logo-img">
             </div>
             <div class="credit-logo-card">
               <img src="assets/logo/AmanaLab.svg" alt="AmanaLab" class="credit-logo-img">
             </div>
+            <!-- Embaixo: Combogó e Católica/UNICAP -->
             <div class="credit-logo-card">
-              <img src="assets/logo/Combogó.svg" alt="Cobogó" class="credit-logo-img">
+              <img src="assets/logo/Combogo.svg" alt="Combogó" class="credit-logo-img">
+            </div>
+            <div class="credit-logo-card">
+              <img src="assets/logo/Unicap.svg" alt="Universidade Católica de Pernambuco - UNICAP" class="credit-logo-img">
             </div>
           </div>
 
           <div class="credits-footer">
-            <span>MUSARQ AR &copy; 2026 - Experiência Interativa</span>
+            <span>Museu de Arqueologia e Ciências Naturais - UNICAP</span>
           </div>
         </div>
       </div>
