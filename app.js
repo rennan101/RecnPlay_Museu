@@ -10,18 +10,31 @@ class MuseumARApp {
     this.hudViewfinder = document.getElementById('hud-viewfinder');
     this.hudStatus = document.getElementById('hud-status');
     
+    // Scanner Holográfico HUD
+    this.hudScanOverlay = document.getElementById('hud-scan-overlay');
+    this.hudScanPercentage = document.getElementById('hud-scan-percentage');
+    this.isScanningActive = false;
+    this.scanningTargetId = null;
+    this.scanStartTime = 0;
+    this.scanDuration = 1200; // 1.2 segundos de animação imersiva de varredura
+    this.lastDetectionSeenTime = 0;
+    
     // Modal em Tela Cheia
     this.objectModal = document.getElementById('object-fullscreen-modal');
     this.closeObjectModalBtn = document.getElementById('close-object-modal');
     this.backToCameraBtn = document.getElementById('back-to-camera-btn');
     
     // Player de Áudio
+    this.audioPlayerCard = document.querySelector('.audio-player-card');
     this.audioBtn = document.getElementById('audio-play-btn');
     this.audioPlayIcon = document.getElementById('audio-icon-play');
     this.audioPauseIcon = document.getElementById('audio-icon-pause');
     this.audioBtnLabel = document.getElementById('audio-btn-label');
     this.audioBtnStatus = document.getElementById('audio-btn-status');
     this.audioSoundWave = document.getElementById('audio-sound-wave');
+    this.audioProgressBar = document.getElementById('audio-progress-bar');
+    this.audioCurrentTimeEl = document.getElementById('audio-current-time');
+    this.audioTotalTimeEl = document.getElementById('audio-total-time');
     
     // Diagnóstico
     this.diagBtn = document.getElementById('diag-btn');
@@ -37,9 +50,9 @@ class MuseumARApp {
     // Áudio
     this.isAudioPlaying = false;
     this.currentAudio = null;
-    this.speechUtterance = null;
+    this.isUserSeeking = false;
     
-    // Métricas
+    // Métricas de FPS
     this.frameCount = 0;
     this.lastFpsTime = performance.now();
     this.currentFps = 0;
@@ -64,10 +77,27 @@ class MuseumARApp {
       });
     }
 
-    // Botão de Áudio
+    // Controles do Player de Áudio
     if (this.audioBtn) {
       this.audioBtn.addEventListener('click', () => {
         this.toggleAudio();
+      });
+    }
+
+    if (this.audioProgressBar) {
+      this.audioProgressBar.addEventListener('input', (e) => {
+        this.isUserSeeking = true;
+        if (this.currentAudio && this.currentAudio.duration) {
+          const targetTime = (parseFloat(e.target.value) / 100) * this.currentAudio.duration;
+          this.audioCurrentTimeEl.textContent = this.formatTime(targetTime);
+        }
+      });
+
+      this.audioProgressBar.addEventListener('change', (e) => {
+        if (this.currentAudio && this.currentAudio.duration) {
+          this.currentAudio.currentTime = (parseFloat(e.target.value) / 100) * this.currentAudio.duration;
+        }
+        this.isUserSeeking = false;
       });
     }
 
@@ -177,7 +207,7 @@ class MuseumARApp {
         if (fpsEl) fpsEl.textContent = `${this.currentFps} FPS`;
       }
 
-      // Se o modal estiver aberto em tela cheia, pausamos a detecção contínua para economizar CPU
+      // Se o modal estiver aberto, pausamos o processamento para economizar CPU
       if (this.isObjectModalOpen) {
         requestAnimationFrame(loop);
         return;
@@ -191,14 +221,53 @@ class MuseumARApp {
           this.updateDiagTelemetry();
         }
 
-        // Se houver detecção e não estivermos no período de cooldown após fechar
+        // Se houver detecção e não estivermos em cooldown pós-fechamento
         if (detection && detection.id && now > this.detectionCooldown) {
-          this.drawTargetHUD(true, detection.bbox, detection.contour);
-          this.hudViewfinder.classList.add('detected');
-          this.showObjectModal(detection.id, detection.bbox, detection.contour);
+          this.lastDetectionSeenTime = now;
+          const targetId = detection.id;
+
+          // Inicia ou continua a animação de varredura/escaneamento
+          if (!this.isScanningActive || this.scanningTargetId !== targetId) {
+            this.isScanningActive = true;
+            this.scanningTargetId = targetId;
+            this.scanStartTime = now;
+            this.hudViewfinder.classList.add('scanning');
+          }
+
+          const elapsed = now - this.scanStartTime;
+          const progress = Math.min(1.0, elapsed / this.scanDuration);
+          const percentage = Math.floor(progress * 100);
+
+          if (this.hudScanPercentage) {
+            this.hudScanPercentage.textContent = `${percentage}%`;
+          }
+
+          const targetName = MUSEUM_ITEMS[targetId] ? MUSEUM_ITEMS[targetId].title : 'Peça';
+          this.hudStatus.textContent = `Escaneando ${targetName} (${percentage}%)`;
+
+          // Desenha a varredura holográfica no canvas
+          this.drawScanningHUD(detection.bbox, detection.contour, progress);
+
+          // Quando a animação de escaneamento completa 100%, abre o modal da peça!
+          if (progress >= 1.0) {
+            this.isScanningActive = false;
+            this.hudViewfinder.classList.remove('scanning');
+            this.hudViewfinder.classList.add('detected');
+            this.showObjectModal(targetId, detection.bbox, detection.contour);
+          }
         } else {
-          this.hudViewfinder.classList.remove('detected');
-          this.drawTargetHUD(false);
+          // Se perder a detecção por mais de 500ms durante o scan, cancela o scan
+          if (this.isScanningActive && now - this.lastDetectionSeenTime > 500) {
+            this.isScanningActive = false;
+            this.scanningTargetId = null;
+            this.hudViewfinder.classList.remove('scanning');
+            this.hudStatus.textContent = "Aponte a câmera para uma peça 3D";
+          }
+
+          if (!this.isScanningActive) {
+            this.hudViewfinder.classList.remove('detected');
+            this.drawTargetHUD(false);
+          }
         }
       }
       requestAnimationFrame(loop);
@@ -236,10 +305,14 @@ class MuseumARApp {
     }
   }
 
-  drawTargetHUD(isDetected, bbox, contour) {
+  drawTargetHUD(isDetected) {
     if (!this.ctx || !this.overlayCanvas) return;
     this.ctx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
-    if (!isDetected) return;
+  }
+
+  drawScanningHUD(bbox, contour, progress) {
+    if (!this.ctx || !this.overlayCanvas) return;
+    this.ctx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
 
     const screenW = this.overlayCanvas.width;
     const screenH = this.overlayCanvas.height;
@@ -251,7 +324,7 @@ class MuseumARApp {
 
     this.ctx.save();
 
-    // Desenho do contorno branco ao redor do objeto
+    // 1. Desenho do Contorno do Objeto em Varredura
     if (contour && contour.length > 2) {
       this.ctx.beginPath();
       const firstX = originX + contour[0].x * sDim;
@@ -265,16 +338,42 @@ class MuseumARApp {
       }
       this.ctx.closePath();
 
-      this.ctx.strokeStyle = "#FFFFFF";
-      this.ctx.lineWidth = 6;
+      // Contorno esmeralda/ciano com brilho holográfico
+      this.ctx.strokeStyle = "#10b981";
+      this.ctx.lineWidth = 5;
       this.ctx.lineCap = "round";
       this.ctx.lineJoin = "round";
-      this.ctx.shadowColor = "rgba(255, 255, 255, 0.9)";
-      this.ctx.shadowBlur = 14;
+      this.ctx.shadowColor = "rgba(16, 185, 129, 0.95)";
+      this.ctx.shadowBlur = 16;
       this.ctx.stroke();
 
-      this.ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+      // Preenchimento holográfico proporcional ao progresso
+      const alpha = 0.05 + progress * 0.15;
+      this.ctx.fillStyle = `rgba(16, 185, 129, ${alpha})`;
       this.ctx.fill();
+
+      // Vértices do Contorno (Nós de Scanner)
+      for (let i = 0; i < contour.length; i += 3) {
+        const ptX = originX + contour[i].x * sDim;
+        const ptY = originY + contour[i].y * sDim;
+        this.ctx.beginPath();
+        this.ctx.arc(ptX, ptY, 3.5, 0, Math.PI * 2);
+        this.ctx.fillStyle = "#ffffff";
+        this.ctx.shadowColor = "#10b981";
+        this.ctx.shadowBlur = 8;
+        this.ctx.fill();
+      }
+
+      // 2. Linha de Laser de Varredura Vertical passando pelo modelo
+      const laserY = originY + progress * sDim;
+      this.ctx.beginPath();
+      this.ctx.moveTo(originX - 10, laserY);
+      this.ctx.lineTo(originX + sDim + 10, laserY);
+      this.ctx.strokeStyle = "#6ee7b7";
+      this.ctx.lineWidth = 3;
+      this.ctx.shadowColor = "#10b981";
+      this.ctx.shadowBlur = 14;
+      this.ctx.stroke();
     }
 
     this.ctx.restore();
@@ -321,8 +420,8 @@ class MuseumARApp {
       }
     }
 
-    // Reseta estado do botão de áudio
-    this.resetAudioUI();
+    // Carrega o arquivo de áudio MP3 original da peça
+    this.loadAudioForCurrentItem();
 
     // Abre o modal em tela cheia
     if (this.objectModal) {
@@ -335,6 +434,8 @@ class MuseumARApp {
   closeObjectModal() {
     this.isObjectModalOpen = false;
     this.detectionCooldown = Date.now() + 1800; // 1.8 segundos de pausa antes de re-escanear
+    this.isScanningActive = false;
+    this.scanningTargetId = null;
 
     this.stopAudio();
 
@@ -345,6 +446,7 @@ class MuseumARApp {
     this.hudStatus.textContent = "Aponte a câmera para uma peça 3D";
     if (this.hudViewfinder) {
       this.hudViewfinder.classList.remove('detected');
+      this.hudViewfinder.classList.remove('scanning');
     }
 
     if (this.ctx && this.overlayCanvas) {
@@ -352,88 +454,108 @@ class MuseumARApp {
     }
   }
 
+  formatTime(seconds) {
+    if (isNaN(seconds) || seconds < 0) return "0:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  }
+
+  loadAudioForCurrentItem() {
+    this.stopAudio();
+    if (!this.currentItemId || !MUSEUM_ITEMS[this.currentItemId]) return;
+
+    const data = MUSEUM_ITEMS[this.currentItemId];
+    if (!data.audioUrl) return;
+
+    this.currentAudio = new Audio(data.audioUrl);
+    this.currentAudio.preload = "auto";
+
+    this.currentAudio.addEventListener('loadedmetadata', () => {
+      if (this.audioTotalTimeEl && this.currentAudio) {
+        this.audioTotalTimeEl.textContent = this.formatTime(this.currentAudio.duration);
+      }
+    });
+
+    this.currentAudio.addEventListener('timeupdate', () => {
+      if (!this.isUserSeeking && this.currentAudio && this.currentAudio.duration) {
+        const pct = (this.currentAudio.currentTime / this.currentAudio.duration) * 100;
+        if (this.audioProgressBar) {
+          this.audioProgressBar.value = pct;
+        }
+        if (this.audioCurrentTimeEl) {
+          this.audioCurrentTimeEl.textContent = this.formatTime(this.currentAudio.currentTime);
+        }
+      }
+    });
+
+    this.currentAudio.addEventListener('ended', () => {
+      this.resetAudioUI();
+    });
+
+    this.currentAudio.addEventListener('pause', () => {
+      if (!this.currentAudio.ended) {
+        this.setAudioPausedUI();
+      }
+    });
+
+    this.currentAudio.addEventListener('play', () => {
+      this.setAudioPlayingUI();
+    });
+
+    this.currentAudio.addEventListener('error', (e) => {
+      console.warn("Erro ao carregar arquivo MP3 original:", e);
+      if (this.audioBtnStatus) {
+        this.audioBtnStatus.textContent = "Áudio indisponível no momento";
+      }
+      this.resetAudioUI();
+    });
+
+    this.resetAudioUI();
+  }
+
   resetAudioUI() {
     this.isAudioPlaying = false;
-    if (this.audioBtn) this.audioBtn.classList.remove('playing');
+    if (this.audioPlayerCard) this.audioPlayerCard.classList.remove('playing');
     if (this.audioPlayIcon) this.audioPlayIcon.style.display = 'block';
     if (this.audioPauseIcon) this.audioPauseIcon.style.display = 'none';
-    if (this.audioBtnLabel) this.audioBtnLabel.textContent = 'Ouvir Narração da Peça';
-    if (this.audioBtnStatus) this.audioBtnStatus.textContent = 'Clique para reproduzir o áudio explicativo';
+    if (this.audioBtnLabel) this.audioBtnLabel.textContent = 'Narração da Peça';
+    if (this.audioBtnStatus) this.audioBtnStatus.textContent = 'Toque para ouvir a narração';
+    if (this.audioProgressBar) this.audioProgressBar.value = 0;
+    if (this.audioCurrentTimeEl) this.audioCurrentTimeEl.textContent = '0:00';
+  }
+
+  setAudioPausedUI() {
+    this.isAudioPlaying = false;
+    if (this.audioPlayerCard) this.audioPlayerCard.classList.remove('playing');
+    if (this.audioPlayIcon) this.audioPlayIcon.style.display = 'block';
+    if (this.audioPauseIcon) this.audioPauseIcon.style.display = 'none';
+    if (this.audioBtnLabel) this.audioBtnLabel.textContent = 'Narração Pausada';
+    if (this.audioBtnStatus) this.audioBtnStatus.textContent = 'Toque para continuar';
   }
 
   setAudioPlayingUI() {
     this.isAudioPlaying = true;
-    if (this.audioBtn) this.audioBtn.classList.add('playing');
+    if (this.audioPlayerCard) this.audioPlayerCard.classList.add('playing');
     if (this.audioPlayIcon) this.audioPlayIcon.style.display = 'none';
     if (this.audioPauseIcon) this.audioPauseIcon.style.display = 'block';
-    if (this.audioBtnLabel) this.audioBtnLabel.textContent = 'Pausar Narração';
-    if (this.audioBtnStatus) this.audioBtnStatus.textContent = 'Reproduzindo áudio explicativo...';
+    if (this.audioBtnLabel) this.audioBtnLabel.textContent = 'Reproduzindo Áudio';
+    if (this.audioBtnStatus) this.audioBtnStatus.textContent = 'Ouvindo narração oficial';
   }
 
   toggleAudio() {
+    if (!this.currentAudio) {
+      this.loadAudioForCurrentItem();
+    }
+    if (!this.currentAudio) return;
+
     if (this.isAudioPlaying) {
-      this.stopAudio();
+      this.currentAudio.pause();
     } else {
-      this.playAudio();
+      this.currentAudio.play().catch(err => {
+        console.warn("Reprodução de áudio bloqueada pelo navegador:", err);
+      });
     }
-  }
-
-  playAudio() {
-    if (!this.currentItemId || !MUSEUM_ITEMS[this.currentItemId]) {
-      return;
-    }
-
-    this.stopAudio();
-    const data = MUSEUM_ITEMS[this.currentItemId];
-
-    this.setAudioPlayingUI();
-
-    // 1. Tentativa de reprodução via arquivo de áudio
-    if (data.audioUrl) {
-      this.currentAudio = new Audio(data.audioUrl);
-
-      this.currentAudio.onended = () => {
-        this.resetAudioUI();
-      };
-
-      this.currentAudio.onerror = (e) => {
-        console.warn("Erro ao reproduzir arquivo de áudio. Utilizando síntese de voz nativa...", e);
-        this.fallbackSpeechSynthesis(data.fullText);
-      };
-
-      const playPromise = this.currentAudio.play();
-      if (playPromise !== undefined) {
-        playPromise.catch((err) => {
-          console.warn("Autoplay bloqueado ou falha no arquivo. Utilizando síntese de voz nativa:", err);
-          this.fallbackSpeechSynthesis(data.fullText);
-        });
-      }
-    } else {
-      this.fallbackSpeechSynthesis(data.fullText);
-    }
-  }
-
-  fallbackSpeechSynthesis(text) {
-    if (!('speechSynthesis' in window)) {
-      this.resetAudioUI();
-      return;
-    }
-
-    window.speechSynthesis.cancel();
-    this.speechUtterance = new SpeechSynthesisUtterance(text);
-    this.speechUtterance.lang = 'pt-BR';
-    this.speechUtterance.rate = 1.0;
-    this.speechUtterance.pitch = 1.0;
-
-    this.speechUtterance.onend = () => {
-      this.resetAudioUI();
-    };
-
-    this.speechUtterance.onerror = () => {
-      this.resetAudioUI();
-    };
-
-    window.speechSynthesis.speak(this.speechUtterance);
   }
 
   stopAudio() {
@@ -442,12 +564,6 @@ class MuseumARApp {
       this.currentAudio.currentTime = 0;
       this.currentAudio = null;
     }
-
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
-
-    this.speechUtterance = null;
     this.resetAudioUI();
   }
 }

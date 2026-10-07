@@ -82,7 +82,7 @@
       </div>
     </div>
 
-    <!-- Mira HUD Inteligente -->
+    <!-- Mira HUD Inteligente com Scanner Holográfico -->
     <div id="hud-viewfinder" class="hud-viewfinder">
       <div class="hud-corners">
         <div class="hud-corner tl"></div>
@@ -90,6 +90,12 @@
         <div class="hud-corner bl"></div>
         <div class="hud-corner br"></div>
         <div class="hud-scan-line"></div>
+      </div>
+      <!-- Overlay de Progresso de Escaneamento 3D -->
+      <div id="hud-scan-overlay" class="hud-scan-overlay">
+        <div class="scan-pulse-ring"></div>
+        <div class="scan-status-tag">ESCANEANDO PEÇA</div>
+        <div id="hud-scan-percentage" class="scan-percentage">0%</div>
       </div>
       <div id="hud-status" class="hud-label">Iniciando câmera...</div>
     </div>
@@ -115,26 +121,37 @@
             <div id="card-subtitle" class="object-subtitle">Homem pré-histórico</div>
           </div>
 
-          <!-- Player de Narração em Áudio -->
-          <div class="audio-player-banner">
-            <button id="audio-play-btn" class="audio-banner-btn" title="Ouvir Narração">
-              <div class="audio-btn-icon-wrapper">
-                <svg id="audio-icon-play" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+          <!-- Player de Narração em Áudio com Barra de Progresso -->
+          <div class="audio-player-card">
+            <div class="audio-player-top">
+              <button id="audio-play-btn" class="audio-circle-play-btn" title="Reproduzir / Pausar Narração">
+                <svg id="audio-icon-play" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                   <polygon points="5 3 19 12 5 21 5 3"></polygon>
                 </svg>
-                <svg id="audio-icon-pause" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" style="display: none;">
+                <svg id="audio-icon-pause" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="display: none;">
                   <rect x="6" y="4" width="4" height="16"></rect>
                   <rect x="14" y="4" width="4" height="16"></rect>
                 </svg>
+              </button>
+              <div class="audio-info">
+                <div class="audio-title-row">
+                  <span id="audio-btn-label" class="audio-title">Narração da Peça</span>
+                  <div class="audio-sound-wave" id="audio-sound-wave">
+                    <span></span><span></span><span></span><span></span>
+                  </div>
+                </div>
+                <span id="audio-btn-status" class="audio-subtitle">Toque para ouvir a narração</span>
               </div>
-              <div class="audio-btn-labels">
-                <span id="audio-btn-label" class="audio-btn-title">Ouvir Narração da Peça</span>
-                <span id="audio-btn-status" class="audio-btn-sub">Clique para reproduzir o áudio explicativo</span>
+            </div>
+
+            <!-- Barra de Progresso Interativa e Timestamps -->
+            <div class="audio-timeline-container">
+              <input type="range" id="audio-progress-bar" class="audio-progress-slider" min="0" max="100" value="0" step="0.1" aria-label="Progresso do áudio">
+              <div class="audio-time-row">
+                <span id="audio-current-time" class="time-label">0:00</span>
+                <span id="audio-total-time" class="time-label">0:00</span>
               </div>
-              <div class="audio-sound-wave" id="audio-sound-wave">
-                <span></span><span></span><span></span><span></span>
-              </div>
-            </button>
+            </div>
           </div>
 
           <!-- Descrição Completa -->
@@ -173,20 +190,20 @@
           <p class="credits-intro">Aplicação de Realidade Aumentada desenvolvida para o acervo e experiência interativa do Museu.</p>
           
           <div class="credits-grid">
-            <!-- Topo: Museu e AmanaLab -->
-            <div class="credit-logo-card">
+            <!-- Topo: Museu e AmanaLab (redirecionam para o site do Museu) -->
+            <a href="https://portal.unicap.br/museu" target="_blank" rel="noopener noreferrer" class="credit-logo-card" title="Visitar site do Museu de Arqueologia e Ciências Naturais - UNICAP">
               <img src="assets/logo/MUSARQ_Logo.svg" alt="Museu de Arqueologia e Ciências Naturais - MUSARQ" class="credit-logo-img">
-            </div>
-            <div class="credit-logo-card">
+            </a>
+            <a href="https://portal.unicap.br/museu" target="_blank" rel="noopener noreferrer" class="credit-logo-card" title="AmanaLab - Visitar site do Museu">
               <img src="assets/logo/AmanaLab.svg" alt="AmanaLab" class="credit-logo-img">
-            </div>
+            </a>
             <!-- Embaixo: Combogó e Católica/UNICAP -->
-            <div class="credit-logo-card">
+            <a href="https://combogounicap.vercel.app/" target="_blank" rel="noopener noreferrer" class="credit-logo-card" title="Visitar Combogó Jogos">
               <img src="assets/logo/Combogo.svg" alt="Combogó" class="credit-logo-img">
-            </div>
-            <div class="credit-logo-card">
-              <img src="assets/logo/Unicap.svg" alt="Universidade Católica de Pernambuco - UNICAP" class="credit-logo-img">
-            </div>
+            </a>
+            <a href="https://portal.unicap.br/w/jogos-digitais" target="_blank" rel="noopener noreferrer" class="credit-logo-card" title="Conhecer o Curso de Jogos Digitais - UNICAP">
+              <img src="assets/logo/Unicap.svg" alt="Curso de Jogos Digitais - UNICAP" class="credit-logo-img">
+            </a>
           </div>
 
           <div class="credits-footer">
