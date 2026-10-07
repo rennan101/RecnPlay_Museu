@@ -12,7 +12,7 @@ const MUSEUM_ITEMS = {
     icon: "skull",
     audioUrl: "assets/audio/flautista.mp3",
     shortDescription: "Reconstrução 3D facial e sepultamento com flauta óssea.",
-    fullText: `Homem pré-histórico conhecido como "flautista". Homem com cerca de 45 anos que viveu há 2.000 anos antes do presente no Agreste de Pernambuco. Enterrado com ele, a flauta feita de um osso de perna humana. A face foi reconstruída em 3D. O sepultamento é de origem do sítio`,
+    fullText: `Olha que fascinante! Você está diante do "Flautista", um dos achados arqueológicos mais incríveis de Pernambuco! Há 2.000 anos, esse homem viveu no Agreste e foi sepultado com uma flauta esculpida em um osso de perna humana. A face dele foi reconstruída fielmente em 3D a partir do crânio original!`,
     facts: [
       { label: "Idade estimada", value: "~45 anos" },
       { label: "Período", value: "2.000 anos antes do presente" },
@@ -30,7 +30,7 @@ const MUSEUM_ITEMS = {
     icon: "bone",
     audioUrl: "assets/audio/hippidion.mp3",
     shortDescription: "Osso do tornozelo (astrágalo) impresso em 3D.",
-    fullText: `Osso do tornozelo (astrágalo), impresso em 3D, de um cavalo (Hippidion principale), que viveu durante o período do Quaternário (0,8-0,012 Ma.) em Pernambuco.`,
+    fullText: `Incrível! Esse é o astrágalo, o osso do tornozelo do lendário Hippidion principale! Um cavalo pré-histórico gigante da nossa megafauna que viveu aqui mesmo em Pernambuco há milhares de anos! Esta réplica 3D perfeita permite você segurar um pedaço vivo da pré-história nas suas mãos!`,
     facts: [
       { label: "Espécie", value: "Hippidion principale" },
       { label: "Elemento ósseo", value: "Astrágalo (Tornozelo)" },
@@ -48,9 +48,7 @@ const MUSEUM_ITEMS = {
     icon: "water",
     audioUrl: "assets/audio/peixeboi.mp3",
     shortDescription: "Mamífero aquático herbívoro do litoral nordestino.",
-    fullText: `Os peixes-bois pertencem a ordem chamada de Sirenia, contendo duas espécies no Brasil: o peixe-boi marinho (Trichechus manatus), que ocorre desde o nordeste do Brasil até a América Central (com pontos de descontinuidade em toda a área).
-
-São animais herbívoros, se alimentando de algas, capim agulha e folhas do mangue, porém podem se alimentar de invertebrados ocasionalmente ou acidentalmente.`,
+    fullText: `Que descoberta espetacular! O peixe-boi marinho é um dos mamíferos aquáticos mais dóceis e fascinantes do Brasil! Esses gigantes gentis nadam desde o litoral nordestino até a América Central, se alimentando de algas e mangues. Veja como a anatomia óssea dele é adaptada perfeitamente para deslizar nas águas!`,
     facts: [
       { label: "Ordem", value: "Sirenia" },
       { label: "Espécie marinha", value: "Trichechus manatus" },
