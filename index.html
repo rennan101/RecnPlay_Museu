@@ -24,6 +24,11 @@
         <span class="brand-title">Rec'n'Play Museu AR</span>
       </div>
       <div class="top-actions">
+        <button id="diag-btn" class="icon-btn" title="Painel de Diagnóstico">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+        </button>
         <button id="flip-camera-btn" class="icon-btn" title="Alternar Câmera">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
@@ -38,6 +43,45 @@
         </button>
       </div>
     </header>
+
+    <!-- Painel de Diagnóstico em Tempo Real (Oculto por padrão) -->
+    <div id="diag-panel" class="diag-panel">
+      <div class="diag-header">
+        <h4>Diagnóstico de Reconhecimento</h4>
+        <span id="diag-fps">0 FPS</span>
+      </div>
+      <div class="diag-body">
+        <div class="diag-row">
+          <span>Status:</span> <strong id="diag-status">Buscando...</strong>
+        </div>
+        <div class="diag-row">
+          <span>Bordas Detectadas:</span> <span id="diag-edges">0</span>
+        </div>
+        <div class="diag-scores" id="diag-scores">
+          <div class="score-item">
+            <span>Flautista:</span>
+            <div class="progress-bar"><div id="score-flautista" class="progress-fill" style="width: 0%"></div></div>
+            <strong id="val-flautista">0%</strong>
+          </div>
+          <div class="score-item">
+            <span>Hippidion:</span>
+            <div class="progress-bar"><div id="score-hippidion" class="progress-fill" style="width: 0%"></div></div>
+            <strong id="val-hippidion">0%</strong>
+          </div>
+          <div class="score-item">
+            <span>Peixe-boi:</span>
+            <div class="progress-bar"><div id="score-peixeboi" class="progress-fill" style="width: 0%"></div></div>
+            <strong id="val-peixeboi">0%</strong>
+          </div>
+        </div>
+        <div class="diag-metrics" id="diag-metrics">
+          <div>Aspect Ratio: <strong id="m-aspect">-</strong></div>
+          <div>Densidade: <strong id="m-density">-</strong></div>
+          <div>Massa Superior: <strong id="m-top">-</strong></div>
+          <div>Simetria: <strong id="m-sym">-</strong></div>
+        </div>
+      </div>
+    </div>
 
     <!-- Mira HUD Inteligente -->
     <div id="hud-viewfinder" class="hud-viewfinder">

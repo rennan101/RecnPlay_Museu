@@ -23,30 +23,44 @@ class ShapeRecognizer {
   setupReferenceSignatures() {
     /**
      * Assinaturas de Perfil Morfológico e Distribuição de Densidade / Contorno:
-     * - Flautista: Estrutura alongada vertical com calota arredondada no topo e estreitamento maxilar/mandíbula.
-     * - Hippidion (Astrágalo): Forma cúbica/articular compacta, aspecto ósseo denso com concavidades e ranhuras articulares.
-     * - Peixe-boi: Forma óssea ampla/alongada com arco zigomático proeminente e rostro característico.
+     * - Flautista: Estrutura vertical alongada (1.2 - 1.5), massa predominante no topo (calota), alta simetria.
+     * - Hippidion (Astrágalo): Forma cúbica/articular compacta (0.95 - 1.15), textura óssea densa e distribuição homogênea.
+     * - Peixe-boi: Forma óssea alongada horizontalmente (0.6 - 0.85), base mandibular pesada.
      */
     this.signatures = {
       flautista: {
-        aspectRatio: 1.35, // Altura > Largura (formato craniano frontal)
+        id: "flautista",
+        name: "Flautista",
+        aspectRatio: 1.35,
         edgeDensity: 0.28,
-        topHeavy: 0.65, // Mais massa visual na parte superior (calota)
+        topHeavy: 0.65,
         centerSymmetry: 0.82
       },
       hippidion: {
-        aspectRatio: 1.05, // Compacto e volumétrico
+        id: "hippidion",
+        name: "Hippidion",
+        aspectRatio: 1.05,
         edgeDensity: 0.35,
-        topHeavy: 0.50, // Distribuição homogênea
+        topHeavy: 0.50,
         centerSymmetry: 0.60
       },
       peixeboi: {
-        aspectRatio: 0.75, // Mais largo / horizontal que alto
+        id: "peixeboi",
+        name: "Peixe-boi",
+        aspectRatio: 0.75,
         edgeDensity: 0.31,
         topHeavy: 0.42,
         centerSymmetry: 0.75
       }
     };
+    this.lastTelemetry = null;
+  }
+
+  /**
+   * Retorna os dados de diagnóstico do último quadro analisado
+   */
+  getTelemetry() {
+    return this.lastTelemetry;
   }
 
   /**
@@ -72,7 +86,7 @@ class ShapeRecognizer {
     const imgData = this.ctx.getImageData(0, 0, sampleSize, sampleSize);
     const data = imgData.data;
 
-    // Análise de Gradiente / Bordas (Sobel Simplificado)
+    // Análise de Gradiente / Bordas (Sobel com limiar adaptativo)
     let totalEdges = 0;
     let topHalfEdges = 0;
     let bottomHalfEdges = 0;
@@ -81,7 +95,6 @@ class ShapeRecognizer {
 
     const gray = new Float32Array(sampleSize * sampleSize);
     for (let i = 0; i < data.length; i += 4) {
-      // Luminância
       gray[i / 4] = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) / 255.0;
     }
 
@@ -90,7 +103,6 @@ class ShapeRecognizer {
     for (let y = 1; y < sampleSize - 1; y++) {
       for (let x = 1; x < sampleSize - 1; x++) {
         const idx = y * sampleSize + x;
-        // Gradiente Horizontal & Vertical
         const gx = -gray[idx - sampleSize - 1] + gray[idx - sampleSize + 1]
                    -2 * gray[idx - 1] + 2 * gray[idx + 1]
                    -gray[idx + sampleSize - 1] + gray[idx + sampleSize + 1];
@@ -99,7 +111,7 @@ class ShapeRecognizer {
                    +gray[idx + sampleSize - 1] + 2 * gray[idx + sampleSize] + gray[idx + sampleSize + 1];
 
         const magnitude = Math.sqrt(gx * gx + gy * gy);
-        if (magnitude > 0.35) {
+        if (magnitude > 0.32) {
           totalEdges++;
           if (y < sampleSize / 2) topHalfEdges++;
           else bottomHalfEdges++;
@@ -115,8 +127,15 @@ class ShapeRecognizer {
       }
     }
 
-    // Se houver poucas bordas, é apenas fundo vazio
-    if (totalEdges < 150) {
+    // Telemetria básica quando não há bordas suficientes
+    if (totalEdges < 140) {
+      this.lastTelemetry = {
+        status: "searching",
+        message: "Enquadre o objeto no centro",
+        totalEdges,
+        metrics: null,
+        scores: {}
+      };
       this.pushHistory(null);
       return null;
     }
@@ -128,23 +147,46 @@ class ShapeRecognizer {
     const currentTopHeavy = (topHalfEdges + 1) / (totalEdges + 2);
     const symmetry = 1.0 - Math.abs(leftEdges - rightEdges) / (totalEdges + 1);
 
-    // Comparação de Distância Euclidiana com os alvos cadastrados
+    // Comparação de Distância Euclidiana ponderada com os 3 alvos
     let bestMatch = null;
     let lowestDistance = 999;
+    const scores = {};
 
     for (const [id, sig] of Object.entries(this.signatures)) {
-      const dAspect = Math.abs(currentAspectRatio - sig.aspectRatio) * 1.5;
-      const dDensity = Math.abs(currentEdgeDensity - sig.edgeDensity) * 1.0;
+      const dAspect = Math.abs(currentAspectRatio - sig.aspectRatio) * 1.6;
+      const dDensity = Math.abs(currentEdgeDensity - sig.edgeDensity) * 1.1;
       const dTop = Math.abs(currentTopHeavy - sig.topHeavy) * 1.8;
-      const dSym = Math.abs(symmetry - sig.centerSymmetry) * 0.8;
+      const dSym = Math.abs(symmetry - sig.centerSymmetry) * 0.9;
 
       const totalDist = Math.sqrt(dAspect * dAspect + dDensity * dDensity + dTop * dTop + dSym * dSym);
+      const confidencePercent = Math.max(0, Math.min(100, Math.round((1 - (totalDist / 1.5)) * 100)));
+      scores[id] = {
+        name: sig.name,
+        confidence: confidencePercent,
+        distance: totalDist.toFixed(2)
+      };
 
       if (totalDist < lowestDistance) {
         lowestDistance = totalDist;
         bestMatch = id;
       }
     }
+
+    // Salva telemetria detalhada para o painel de diagnóstico
+    this.lastTelemetry = {
+      status: "analyzing",
+      message: (lowestDistance < 0.8) ? `Detectando ${this.signatures[bestMatch].name}` : "Ajuste o enquadramento",
+      totalEdges,
+      metrics: {
+        aspectRatio: currentAspectRatio.toFixed(2),
+        edgeDensity: currentEdgeDensity.toFixed(2),
+        topHeavy: currentTopHeavy.toFixed(2),
+        symmetry: symmetry.toFixed(2),
+        size: `${objWidth}x${objHeight}`
+      },
+      bestMatch,
+      scores
+    };
 
     // Extrai o contorno periférico por varredura angular radial (Radial Raycasting)
     const centerX = (minX + maxX) / 2;

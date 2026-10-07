@@ -11,6 +11,9 @@ class MuseumARApp {
     this.hudStatus = document.getElementById('hud-status');
     this.cardContainer = document.getElementById('floating-card-container');
     this.audioBtn = document.getElementById('audio-play-btn');
+    this.diagBtn = document.getElementById('diag-btn');
+    this.diagPanel = document.getElementById('diag-panel');
+    this.isDiagVisible = false;
     
     this.recognizer = new ShapeRecognizer();
     this.currentItemId = null;
@@ -20,6 +23,9 @@ class MuseumARApp {
     this.lastDetectionTime = 0;
     this.detectionTimeout = 2800; // Tempo em ms para manter o card visível
     this.currentBBox = null;
+    this.frameCount = 0;
+    this.lastFpsTime = performance.now();
+    this.currentFps = 0;
     
     this.init();
   }
@@ -32,6 +38,15 @@ class MuseumARApp {
   }
 
   setupEventListeners() {
+    // Painel de Diagnóstico
+    if (this.diagBtn && this.diagPanel) {
+      this.diagBtn.addEventListener('click', () => {
+        this.isDiagVisible = !this.isDiagVisible;
+        this.diagPanel.classList.toggle('visible', this.isDiagVisible);
+        this.diagBtn.classList.toggle('active', this.isDiagVisible);
+      });
+    }
+
     // Botão de Áudio / Leitura em Voz Alta
     if (this.audioBtn) {
       this.audioBtn.addEventListener('click', () => {
@@ -101,9 +116,24 @@ class MuseumARApp {
 
   startProcessingLoop() {
     const loop = () => {
+      // Cálculo de FPS
+      this.frameCount++;
+      const nowPerf = performance.now();
+      if (nowPerf - this.lastFpsTime >= 1000) {
+        this.currentFps = Math.round((this.frameCount * 1000) / (nowPerf - this.lastFpsTime));
+        this.frameCount = 0;
+        this.lastFpsTime = nowPerf;
+        const fpsEl = document.getElementById('diag-fps');
+        if (fpsEl) fpsEl.textContent = `${this.currentFps} FPS`;
+      }
+
       if (this.video.readyState === this.video.HAVE_ENOUGH_DATA) {
         const detection = this.recognizer.processFrame(this.video);
         const now = Date.now();
+
+        if (this.isDiagVisible) {
+          this.updateDiagTelemetry();
+        }
 
         if (detection && detection.id) {
           this.lastDetectionTime = now;
@@ -118,7 +148,6 @@ class MuseumARApp {
             this.hudViewfinder.classList.remove('detected');
             this.drawTargetHUD(false);
           } else if (this.currentBBox) {
-            // Mantém renderização suave enquanto ainda dentro do timeout
             this.drawTargetHUD(true, this.currentBBox, this.currentContour);
           }
         }
@@ -126,6 +155,32 @@ class MuseumARApp {
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
+  }
+
+  updateDiagTelemetry() {
+    const telemetry = this.recognizer.getTelemetry();
+    if (!telemetry) return;
+
+    const statusEl = document.getElementById('diag-status');
+    const edgesEl = document.getElementById('diag-edges');
+    if (statusEl) statusEl.textContent = telemetry.message;
+    if (edgesEl) edgesEl.textContent = telemetry.totalEdges;
+
+    if (telemetry.scores) {
+      for (const [id, sc] of Object.entries(telemetry.scores)) {
+        const barEl = document.getElementById(`score-${id}`);
+        const valEl = document.getElementById(`val-${id}`);
+        if (barEl) barEl.style.width = `${sc.confidence}%`;
+        if (valEl) valEl.textContent = `${sc.confidence}%`;
+      }
+    }
+
+    if (telemetry.metrics) {
+      document.getElementById('m-aspect').textContent = telemetry.metrics.aspectRatio;
+      document.getElementById('m-density').textContent = telemetry.metrics.edgeDensity;
+      document.getElementById('m-top').textContent = telemetry.metrics.topHeavy;
+      document.getElementById('m-sym').textContent = telemetry.metrics.symmetry;
+    }
   }
 
   drawTargetHUD(isDetected, bbox, contour) {

@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verificador & Teste em Lote - WebAR Museu</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      overflow-y: auto;
+      background: #090c10;
+      color: #f8fafc;
+      padding: 24px;
+      font-family: 'Inter', system-ui, sans-serif;
+    }
+    .test-container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .test-header {
+      margin-bottom: 24px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 16px;
+    }
+    .test-header h1 {
+      font-size: 24px;
+      color: var(--accent-cyan);
+    }
+    .test-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+    @media (max-width: 768px) {
+      .test-grid { grid-template-columns: 1fr; }
+    }
+    .test-card {
+      background: rgba(18, 24, 38, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .drop-zone {
+      border: 2px dashed rgba(6, 182, 212, 0.5);
+      border-radius: 8px;
+      padding: 30px;
+      text-align: center;
+      cursor: pointer;
+      margin-bottom: 16px;
+      transition: background 0.2s ease;
+    }
+    .drop-zone:hover {
+      background: rgba(6, 182, 212, 0.08);
+    }
+    .preview-canvas {
+      width: 100%;
+      height: 240px;
+      background: #000;
+      border-radius: 8px;
+      object-fit: contain;
+    }
+    .results-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      font-size: 13px;
+    }
+    .results-table th, .results-table td {
+      padding: 10px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .results-table th {
+      color: var(--accent-cyan);
+    }
+    .badge-pass {
+      background: rgba(16, 185, 129, 0.2);
+      color: #10b981;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-weight: 700;
+    }
+    .btn-action {
+      background: var(--accent-cyan);
+      color: #000;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 6px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="test-container">
+    <div class="test-header">
+      <h1>Validador de Reconhecimento dos 3 Objetos</h1>
+      <p style="color: #94a3b8; margin-top: 4px;">Faça upload de fotos das peças 3D impressas (Flautista, Hippidion ou Peixe-boi) para validar a precisão dos algoritmos.</p>
+    </div>
+
+    <div class="test-grid">
+      <div class="test-card">
+        <h3>1. Selecionar Imagem de Teste</h3>
+        <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+          <p>Arraste uma foto da peça aqui ou clique para selecionar</p>
+          <input type="file" id="file-input" accept="image/*" style="display: none;">
+        </div>
+        <canvas id="test-canvas" class="preview-canvas"></canvas>
+      </div>
+
+      <div class="test-card">
+        <h3>2. Diagnóstico da Visão Computacional</h3>
+        <div id="test-results">
+          <p style="color: #94a3b8; margin-top: 12px;">Selecione uma imagem para ver os resultados calculados.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="test-card">
+      <h3>3. Assinaturas e Critérios de Aceite Cadastrados</h3>
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>Objeto</th>
+            <th>Proporção (Aspect Ratio H/W)</th>
+            <th>Densidade de Bordas</th>
+            <th>Massa Superior</th>
+            <th>Simetria</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Flautista</strong> (Crânio)</td>
+            <td>1.35 (Vertical)</td>
+            <td>0.28</td>
+            <td>0.65 (Calota pesada)</td>
+            <td>0.82</td>
+          </tr>
+          <tr>
+            <td><strong>Hippidion</strong> (Astrágalo)</td>
+            <td>1.05 (Cúbico)</td>
+            <td>0.35 (Alta textura)</td>
+            <td>0.50 (Equilibrado)</td>
+            <td>0.60</td>
+          </tr>
+          <tr>
+            <td><strong>Peixe-boi</strong> (Mandíbula)</td>
+            <td>0.75 (Horizontal)</td>
+            <td>0.31</td>
+            <td>0.42 (Base pesada)</td>
+            <td>0.75</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="margin-top: 16px;">
+        <a href="index.html" class="btn-action" style="display: inline-block; text-decoration: none;">Abrir Experiência WebAR ao Vivo</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="recognition.js"></script>
+  <script>
+    const recognizer = new ShapeRecognizer();
+    recognizer.init();
+
+    const fileInput = document.getElementById('file-input');
+    const canvas = document.getElementById('test-canvas');
+    const ctx = canvas.getContext('2d');
+    const resultsContainer = document.getElementById('test-results');
+
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const img = new Image();
+      img.onload = () => {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+
+        // Processa a imagem simulando elemento de vídeo
+        const fakeVideo = {
+          videoWidth: img.width,
+          videoHeight: img.height,
+          readyState: 4
+        };
+
+        // Desenha no recognizer
+        recognizer.canvas.width = 128;
+        recognizer.canvas.height = 128;
+        const sDim = Math.min(img.width, img.height);
+        const sx = (img.width - sDim) / 2;
+        const sy = (img.height - sDim) / 2;
+        recognizer.ctx.drawImage(img, sx, sy, sDim, sDim, 0, 0, 128, 128);
+
+        const result = recognizer.processFrame(fakeVideo);
+        const telemetry = recognizer.getTelemetry();
+
+        renderResults(telemetry);
+      };
+      img.src = URL.createObjectURL(file);
+    });
+
+    function renderResults(tel) {
+      if (!tel || !tel.metrics) {
+        resultsContainer.innerHTML = '<p style="color: #ef4444; margin-top: 12px;">Nenhum objeto com bordas suficientes foi detectado na imagem.</p>';
+        return;
+      }
+
+      let scoresHtml = '';
+      for (const [id, sc] of Object.entries(tel.scores)) {
+        const isWinner = (id === tel.bestMatch);
+        scoresHtml += `
+          <div style="margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; font-weight: ${isWinner ? 'bold' : 'normal'}; color: ${isWinner ? '#06b6d4' : '#fff'};">
+              <span>${sc.name}</span>
+              <span>${sc.confidence}%</span>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" style="width: ${sc.confidence}%; background: ${isWinner ? '#06b6d4' : '#64748b'}"></div></div>
+          </div>
+        `;
+      }
+
+      resultsContainer.innerHTML = `
+        <div style="margin-top: 10px;">
+          <p><strong>Resultado Principal:</strong> <span class="badge-pass">${tel.scores[tel.bestMatch]?.name || 'Indefinido'}</span></p>
+          <div style="margin-top: 14px;">${scoresHtml}</div>
+          <div class="diag-metrics" style="margin-top: 16px;">
+            <div>Aspect Ratio: <strong>${tel.metrics.aspectRatio}</strong></div>
+            <div>Densidade: <strong>${tel.metrics.edgeDensity}</strong></div>
+            <div>Massa Superior: <strong>${tel.metrics.topHeavy}</strong></div>
+            <div>Simetria: <strong>${tel.metrics.symmetry}</strong></div>
+          </div>
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>
