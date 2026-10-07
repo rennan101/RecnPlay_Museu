@@ -18,8 +18,8 @@ class MuseumARApp {
     this.recognizer = new ShapeRecognizer();
     this.currentItemId = null;
     this.isAudioPlaying = false;
-    this.synth = window.speechSynthesis;
-    this.activeUtterance = null;
+    this.currentAudio = null;
+    this.isAudioPlaying = false;
     this.lastDetectionTime = 0;
     this.detectionTimeout = 2800; // Tempo em ms para manter o card visível
     this.currentBBox = null;
@@ -47,14 +47,14 @@ class MuseumARApp {
       });
     }
 
-    // Botão de Áudio / Leitura em Voz Alta
+    // Botão de Áudio Local
     if (this.audioBtn) {
       this.audioBtn.addEventListener('click', () => {
-        this.toggleSpeech();
+        this.toggleAudio();
       });
     }
 
-    // Modal de Ajuda
+    // Modal de Créditos Institucionais
     const helpBtn = document.getElementById('help-btn');
     const helpModal = document.getElementById('help-modal');
     const closeHelp = document.getElementById('close-help');
@@ -288,7 +288,7 @@ class MuseumARApp {
     this.hudStatus.textContent = `Identificado: ${data.title}`;
 
     if (this.isAudioPlaying) {
-      this.stopSpeech();
+      this.stopAudio();
     }
   }
 
@@ -297,7 +297,6 @@ class MuseumARApp {
     const screenH = window.innerHeight;
     const cardW = Math.min(screenW * 0.88, 380);
 
-    // Se a tela for ampla (Desktop/Tablet/Landscape), coloca ao lado direito ou esquerdo
     if (screenW > 768) {
       const left = Math.min(screenW - cardW - 24, (screenW / 2) + 140);
       const top = Math.max(80, (screenH / 2) - 180);
@@ -306,8 +305,7 @@ class MuseumARApp {
       this.cardContainer.style.right = 'auto';
       this.cardContainer.style.bottom = 'auto';
     } else {
-      // Em smartphones retrato, ancora logo abaixo do visor central da peça
-      const top = Math.min(screenH - 280, (screenH / 2) + (Math.min(screenW, screenH) * 0.38) + 10);
+      const top = Math.min(screenH - 300, (screenH / 2) + (Math.min(screenW, screenH) * 0.38) + 10);
       const left = (screenW - cardW) / 2;
       this.cardContainer.style.left = `${left}px`;
       this.cardContainer.style.top = `${top}px`;
@@ -321,51 +319,58 @@ class MuseumARApp {
     this.currentItemId = null;
     this.hudStatus.textContent = "Aponte a câmera para uma peça";
     if (this.isAudioPlaying) {
-      this.stopSpeech();
+      this.stopAudio();
     }
   }
 
-  toggleSpeech() {
+  toggleAudio() {
     if (this.isAudioPlaying) {
-      this.stopSpeech();
+      this.stopAudio();
     } else {
-      this.playSpeech();
+      this.playAudio();
     }
   }
 
-  playSpeech() {
-    if (!this.currentItemId || !MUSEUM_ITEMS[this.currentItemId] || !('speechSynthesis' in window)) {
+  playAudio() {
+    if (!this.currentItemId || !MUSEUM_ITEMS[this.currentItemId]) {
       return;
     }
 
-    this.stopSpeech();
+    this.stopAudio();
 
     const data = MUSEUM_ITEMS[this.currentItemId];
-    this.activeUtterance = new SpeechSynthesisUtterance(data.audioText || data.fullText);
-    this.activeUtterance.lang = 'pt-BR';
-    this.activeUtterance.rate = 1.0;
+    if (!data.audioUrl) return;
 
-    this.activeUtterance.onstart = () => {
+    this.currentAudio = new Audio(data.audioUrl);
+
+    this.currentAudio.onplay = () => {
       this.isAudioPlaying = true;
-      this.audioBtn.classList.add('playing');
+      if (this.audioBtn) this.audioBtn.classList.add('playing');
     };
 
-    this.activeUtterance.onend = () => {
+    this.currentAudio.onended = () => {
       this.isAudioPlaying = false;
-      this.audioBtn.classList.remove('playing');
+      if (this.audioBtn) this.audioBtn.classList.remove('playing');
     };
 
-    this.activeUtterance.onerror = () => {
+    this.currentAudio.onerror = (e) => {
+      console.error("Erro ao carregar arquivo de áudio:", e);
       this.isAudioPlaying = false;
-      this.audioBtn.classList.remove('playing');
+      if (this.audioBtn) this.audioBtn.classList.remove('playing');
     };
 
-    this.synth.speak(this.activeUtterance);
+    this.currentAudio.play().catch(err => {
+      console.warn("Autoplay bloqueado ou erro ao tocar áudio:", err);
+      this.isAudioPlaying = false;
+      if (this.audioBtn) this.audioBtn.classList.remove('playing');
+    });
   }
 
-  stopSpeech() {
-    if (this.synth && this.synth.speaking) {
-      this.synth.cancel();
+  stopAudio() {
+    if (this.currentAudio) {
+      this.currentAudio.pause();
+      this.currentAudio.currentTime = 0;
+      this.currentAudio = null;
     }
     this.isAudioPlaying = false;
     if (this.audioBtn) {

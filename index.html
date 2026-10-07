@@ -20,8 +20,7 @@
     <!-- Barra de Topo / Status -->
     <header class="top-bar">
       <div class="brand-badge">
-        <span class="brand-pulse"></span>
-        <span class="brand-title">Rec'n'Play Museu AR</span>
+        <span class="brand-title">MUSARQ AR</span>
       </div>
       <div class="top-actions">
         <button id="diag-btn" class="icon-btn" title="Painel de Diagnóstico">
@@ -34,7 +33,7 @@
             <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
           </svg>
         </button>
-        <button id="help-btn" class="icon-btn" title="Informações e Ajuda">
+        <button id="help-btn" class="icon-btn" title="Créditos e Realização">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"></circle>
             <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
@@ -95,7 +94,7 @@
       <div id="hud-status" class="hud-label">Iniciando câmera...</div>
     </div>
 
-    <!-- Card de Informação Flutuante Ancorado -->
+    <!-- Card de Informação Flutuante Ancorado (Rolável) -->
     <div id="floating-card-container">
       <div class="info-card">
         <div class="card-header">
@@ -112,26 +111,41 @@
           </button>
         </div>
 
-        <div class="card-body">
+        <div class="card-body scrollable-card-body">
           <p id="card-description" class="card-description"></p>
           <div id="card-facts" class="card-facts"></div>
         </div>
       </div>
     </div>
 
-
-
-    <!-- Modal de Ajuda / Instruções -->
+    <!-- Modal de Créditos e Marcas Institucionais -->
     <div id="help-modal" class="modal-overlay">
-      <div class="modal-content">
+      <div class="modal-content credits-modal-content">
         <div class="modal-header">
-          <h3 class="modal-title">Como funciona a experiência AR</h3>
+          <h3 class="modal-title">Créditos de Desenvolvimento</h3>
           <button id="close-help" class="close-btn">&times;</button>
         </div>
         <div class="modal-body">
-          <p><strong>1. Reconhecimento Direto do Objeto:</strong> Aponte o celular diretamente para a peça 3D exposta (sem necessidade de QR Code ou placas).</p>
-          <p><strong>2. Detecção em Tempo Real:</strong> A mira no centro da tela detectará a geometria do objeto e exibirá os dados históricos ao lado da peça.</p>
-          <p><strong>3. Acessibilidade com Áudio:</strong> Toque no ícone de som no card para escutar a audiodescrição do item.</p>
+          <p class="credits-intro">Aplicação de Realidade Aumentada desenvolvida para o acervo e experiência interativa do Museu.</p>
+          
+          <div class="credits-grid">
+            <div class="credit-logo-card">
+              <img src="assets/logo/MUSARQ_Logo.svg" alt="MUSARQ" class="credit-logo-img">
+            </div>
+            <div class="credit-logo-card">
+              <img src="assets/logo/Unicap.svg" alt="UNICAP" class="credit-logo-img">
+            </div>
+            <div class="credit-logo-card">
+              <img src="assets/logo/AmanaLab.svg" alt="AmanaLab" class="credit-logo-img">
+            </div>
+            <div class="credit-logo-card">
+              <img src="assets/logo/Combogó.svg" alt="Cobogó" class="credit-logo-img">
+            </div>
+          </div>
+
+          <div class="credits-footer">
+            <span>MUSARQ AR &copy; 2026 - Experiência Interativa</span>
+          </div>
         </div>
       </div>
     </div>

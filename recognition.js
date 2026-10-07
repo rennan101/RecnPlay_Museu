@@ -127,11 +127,12 @@ class ShapeRecognizer {
       }
     }
 
-    // Telemetria básica quando não há bordas suficientes
-    if (totalEdges < 140) {
+    // 1. FILTRO DE SUPERFÍCIE/COMPLEXIDADE ÓSSEA (Elimina mesas lisas, mãos e fundos homogêneos)
+    // Objetos 3D ósseos impressos possuem rica textura/relevo (mínimo 280 bordas fortes e dimensões mínimas)
+    if (totalEdges < 280 || (maxX - minX) < 28 || (maxY - minY) < 28) {
       this.lastTelemetry = {
         status: "searching",
-        message: "Enquadre o objeto no centro",
+        message: "Aponte para uma das 3 peças",
         totalEdges,
         metrics: null,
         scores: {}
@@ -147,19 +148,21 @@ class ShapeRecognizer {
     const currentTopHeavy = (topHalfEdges + 1) / (totalEdges + 2);
     const symmetry = 1.0 - Math.abs(leftEdges - rightEdges) / (totalEdges + 1);
 
-    // Comparação de Distância Euclidiana ponderada com os 3 alvos
+    // 2. COMPARAÇÃO RIGOROSA COM AS ASSINATURAS MORFOLÓGICAS
     let bestMatch = null;
     let lowestDistance = 999;
+    let secondLowestDistance = 999;
     const scores = {};
 
     for (const [id, sig] of Object.entries(this.signatures)) {
-      const dAspect = Math.abs(currentAspectRatio - sig.aspectRatio) * 1.6;
-      const dDensity = Math.abs(currentEdgeDensity - sig.edgeDensity) * 1.1;
-      const dTop = Math.abs(currentTopHeavy - sig.topHeavy) * 1.8;
-      const dSym = Math.abs(symmetry - sig.centerSymmetry) * 0.9;
+      const dAspect = Math.abs(currentAspectRatio - sig.aspectRatio) * 2.2;
+      const dDensity = Math.abs(currentEdgeDensity - sig.edgeDensity) * 1.5;
+      const dTop = Math.abs(currentTopHeavy - sig.topHeavy) * 2.4;
+      const dSym = Math.abs(symmetry - sig.centerSymmetry) * 1.2;
 
       const totalDist = Math.sqrt(dAspect * dAspect + dDensity * dDensity + dTop * dTop + dSym * dSym);
-      const confidencePercent = Math.max(0, Math.min(100, Math.round((1 - (totalDist / 1.5)) * 100)));
+      const confidencePercent = Math.max(0, Math.min(100, Math.round((1 - (totalDist / 1.35)) * 100)));
+      
       scores[id] = {
         name: sig.name,
         confidence: confidencePercent,
@@ -167,15 +170,26 @@ class ShapeRecognizer {
       };
 
       if (totalDist < lowestDistance) {
+        secondLowestDistance = lowestDistance;
         lowestDistance = totalDist;
         bestMatch = id;
+      } else if (totalDist < secondLowestDistance) {
+        secondLowestDistance = totalDist;
       }
     }
 
+    // 3. CRITÉRIO ESTREITO ANTI-AMBIGUIDADE:
+    // Exige:
+    // a) Distância máxima baixa (< 0.70) correspondente a confiança >= 78%
+    // b) Separação clara contra o 2º melhor match (evita falsos positivos entre peças ou com objetos genéricos)
+    const bestConfidence = scores[bestMatch] ? scores[bestMatch].confidence : 0;
+    const isSeparated = (secondLowestDistance - lowestDistance) > 0.18;
+    const isStrictMatch = (lowestDistance < 0.68 && bestConfidence >= 78 && isSeparated);
+
     // Salva telemetria detalhada para o painel de diagnóstico
     this.lastTelemetry = {
-      status: "analyzing",
-      message: (lowestDistance < 0.8) ? `Detectando ${this.signatures[bestMatch].name}` : "Ajuste o enquadramento",
+      status: isStrictMatch ? "detected" : "analyzing",
+      message: isStrictMatch ? `Identificado: ${this.signatures[bestMatch].name}` : "Enquadre o objeto no centro",
       totalEdges,
       metrics: {
         aspectRatio: currentAspectRatio.toFixed(2),
@@ -184,9 +198,13 @@ class ShapeRecognizer {
         symmetry: symmetry.toFixed(2),
         size: `${objWidth}x${objHeight}`
       },
-      bestMatch,
+      bestMatch: isStrictMatch ? bestMatch : null,
       scores
     };
+
+    if (!isStrictMatch) {
+      return this.pushHistory(null);
+    }
 
     // Extrai o contorno periférico por varredura angular radial (Radial Raycasting)
     const centerX = (minX + maxX) / 2;
@@ -227,11 +245,9 @@ class ShapeRecognizer {
       });
     }
 
-    const confidence = Math.max(0, 1 - (lowestDistance / 1.6));
-
-    const result = (confidence > 0.55) ? {
+    const result = {
       id: bestMatch,
-      confidence: confidence,
+      confidence: bestConfidence / 100,
       bbox: {
         x: (minX / sampleSize),
         y: (minY / sampleSize),
@@ -239,7 +255,7 @@ class ShapeRecognizer {
         height: (objHeight / sampleSize)
       },
       contour: contourPoints
-    } : null;
+    };
 
     return this.pushHistory(result);
   }
@@ -250,7 +266,7 @@ class ShapeRecognizer {
       this.history.shift();
     }
 
-    // Filtro temporal para evitar flickering
+    // Filtro temporal: Exige ao menos 4 confirmações consecutivas/consistentes do mesmo objeto
     const counts = {};
     let maxId = null;
     let maxCount = 0;
@@ -266,10 +282,10 @@ class ShapeRecognizer {
       }
     }
 
-    if (maxCount >= 2 && latestValidResult) {
+    if (maxCount >= 4 && latestValidResult) {
       return { 
         id: maxId, 
-        confidence: 0.85,
+        confidence: latestValidResult.confidence,
         bbox: latestValidResult.bbox,
         contour: latestValidResult.contour
       };
