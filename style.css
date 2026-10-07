@@ -80,22 +80,16 @@ body, html {
   background: linear-gradient(180deg, rgba(9, 12, 16, 0.8) 0%, rgba(9, 12, 16, 0) 100%);
 }
 
-.brand-badge {
-  display: flex;
-  align-items: center;
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--panel-border);
-  padding: 8px 16px;
-  border-radius: 30px;
-}
-
 .brand-title {
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 800;
-  letter-spacing: 1.2px;
+  letter-spacing: 2px;
   text-transform: uppercase;
-  color: #fff;
+  color: #ffffff;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.95), 0 1px 4px rgba(0, 0, 0, 0.9);
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.9));
+  margin: 0;
+  padding: 0;
 }
 
 .top-actions {
@@ -303,7 +297,7 @@ body, html {
   backdrop-filter: blur(8px);
 }
 
-/* Quando um objeto é detectado ou está escaneando */
+/* Quando um objeto é detectado, está escaneando ou em suspense */
 .hud-viewfinder.detected .hud-corner {
   border-color: var(--accent-cyan);
 }
@@ -314,15 +308,32 @@ body, html {
   animation: cornerPulse 0.6s infinite alternate ease-in-out;
 }
 
+.hud-viewfinder.suspense .hud-corner {
+  border-color: #ffffff;
+  box-shadow: 0 0 25px rgba(255, 255, 255, 1), inset 0 0 10px rgba(255, 255, 255, 0.8);
+  animation: suspenseCornerGlow 0.35s infinite alternate ease-in-out;
+}
+
 @keyframes cornerPulse {
   0% { transform: scale(1); }
   100% { transform: scale(1.05); }
+}
+
+@keyframes suspenseCornerGlow {
+  0% { transform: scale(1); filter: brightness(1.2); }
+  100% { transform: scale(1.08); filter: brightness(2); }
 }
 
 .hud-viewfinder.scanning .hud-scan-line {
   background: linear-gradient(90deg, transparent 0%, var(--accent-emerald) 50%, transparent 100%);
   box-shadow: 0 0 18px var(--accent-emerald);
   animation: scanLineFast 0.7s infinite linear;
+}
+
+.hud-viewfinder.suspense .hud-scan-line {
+  background: linear-gradient(90deg, transparent 0%, #ffffff 50%, transparent 100%);
+  box-shadow: 0 0 25px #ffffff;
+  animation: scanLineFast 0.4s infinite linear;
 }
 
 @keyframes scanLineFast {
@@ -347,7 +358,8 @@ body, html {
   transition: opacity 0.25s ease;
 }
 
-.hud-viewfinder.scanning .hud-scan-overlay {
+.hud-viewfinder.scanning .hud-scan-overlay,
+.hud-viewfinder.suspense .hud-scan-overlay {
   opacity: 1;
 }
 
@@ -358,6 +370,13 @@ body, html {
   border: 2px dashed var(--accent-emerald);
   animation: rotateScanRing 3s infinite linear;
   box-shadow: 0 0 20px rgba(16, 185, 129, 0.4), inset 0 0 15px rgba(16, 185, 129, 0.2);
+}
+
+.hud-viewfinder.suspense .scan-pulse-ring {
+  border-color: #ffffff;
+  border-style: solid;
+  box-shadow: 0 0 35px rgba(255, 255, 255, 1), inset 0 0 20px rgba(255, 255, 255, 0.8);
+  animation: rotateScanRing 1.2s infinite linear;
 }
 
 @keyframes rotateScanRing {
@@ -376,12 +395,26 @@ body, html {
   border: 1px solid rgba(16, 185, 129, 0.4);
 }
 
+.hud-viewfinder.suspense .scan-status-tag {
+  color: #000;
+  background: #ffffff;
+  border-color: #ffffff;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 1);
+  font-weight: 900;
+}
+
 .scan-percentage {
   font-size: 22px;
   font-weight: 800;
   font-family: monospace;
   color: #fff;
   text-shadow: 0 0 10px var(--accent-emerald);
+}
+
+.hud-viewfinder.suspense .scan-percentage {
+  color: #ffffff;
+  text-shadow: 0 0 25px #ffffff, 0 0 45px #ffffff;
+  animation: pulseAudio 0.5s infinite;
 }
 
 /* Modal de Informação da Peça em Tela Cheia */
@@ -400,7 +433,7 @@ body, html {
   flex-direction: column;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   transform: translateY(20px);
   overflow: hidden;
 }
@@ -432,17 +465,12 @@ body, html {
   flex-shrink: 0;
 }
 
-.badge-tag {
-  display: inline-block;
-  font-size: 11px;
+.header-modal-title {
+  font-size: 13px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.6px;
-  padding: 5px 12px;
-  border-radius: 20px;
-  background: rgba(6, 182, 212, 0.15);
+  letter-spacing: 1.5px;
   color: var(--accent-cyan);
-  border: 1px solid rgba(6, 182, 212, 0.3);
 }
 
 .modal-close-icon-btn {

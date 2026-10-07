@@ -12,12 +12,20 @@ class MuseumARApp {
     
     // Scanner Holográfico HUD
     this.hudScanOverlay = document.getElementById('hud-scan-overlay');
+    this.hudScanTag = document.getElementById('hud-scan-tag');
     this.hudScanPercentage = document.getElementById('hud-scan-percentage');
     this.isScanningActive = false;
     this.scanningTargetId = null;
     this.scanStartTime = 0;
     this.scanDuration = 1200; // 1.2 segundos de animação imersiva de varredura
     this.lastDetectionSeenTime = 0;
+
+    // Efeito de Suspense (Objeto 100% Branco e Brilhante)
+    this.isSuspenseActive = false;
+    this.suspenseStartTime = 0;
+    this.suspenseDuration = 800; // 0.8s de suspense luminoso antes de abrir os detalhes
+    this.suspenseTargetId = null;
+    this.lastContour = null;
     
     // Modal em Tela Cheia
     this.objectModal = document.getElementById('object-fullscreen-modal');
@@ -213,17 +221,34 @@ class MuseumARApp {
         return;
       }
 
+      const now = Date.now();
+
+      // FASE DE SUSPENSE ATIVA (Objeto brilhando em branco puro)
+      if (this.isSuspenseActive) {
+        const suspenseElapsed = now - this.suspenseStartTime;
+        this.drawSuspenseHUD(this.lastContour);
+
+        if (suspenseElapsed >= this.suspenseDuration) {
+          this.isSuspenseActive = false;
+          this.hudViewfinder.classList.remove('suspense');
+          this.hudViewfinder.classList.remove('scanning');
+          this.showObjectModal(this.suspenseTargetId);
+        }
+        requestAnimationFrame(loop);
+        return;
+      }
+
       if (this.video.readyState === this.video.HAVE_ENOUGH_DATA) {
         const detection = this.recognizer.processFrame(this.video);
-        const now = Date.now();
 
         if (this.isDiagVisible) {
           this.updateDiagTelemetry();
         }
 
-        // Se houver detecção e não estivermos em cooldown pós-fechamento
+        // Se houver detecção confirmada e não estivermos em cooldown pós-fechamento
         if (detection && detection.id && now > this.detectionCooldown) {
           this.lastDetectionSeenTime = now;
+          this.lastContour = detection.contour;
           const targetId = detection.id;
 
           // Inicia ou continua a animação de varredura/escaneamento
@@ -231,7 +256,9 @@ class MuseumARApp {
             this.isScanningActive = true;
             this.scanningTargetId = targetId;
             this.scanStartTime = now;
+            this.hudViewfinder.classList.remove('suspense');
             this.hudViewfinder.classList.add('scanning');
+            if (this.hudScanTag) this.hudScanTag.textContent = "ESCANEANDO PEÇA";
           }
 
           const elapsed = now - this.scanStartTime;
@@ -248,12 +275,18 @@ class MuseumARApp {
           // Desenha a varredura holográfica no canvas
           this.drawScanningHUD(detection.bbox, detection.contour, progress);
 
-          // Quando a animação de escaneamento completa 100%, abre o modal da peça!
+          // Quando a animação de escaneamento atinge 100%, inicia a FASE DE SUSPENSE BRANCA!
           if (progress >= 1.0) {
             this.isScanningActive = false;
+            this.isSuspenseActive = true;
+            this.suspenseStartTime = now;
+            this.suspenseTargetId = targetId;
+            
             this.hudViewfinder.classList.remove('scanning');
-            this.hudViewfinder.classList.add('detected');
-            this.showObjectModal(targetId, detection.bbox, detection.contour);
+            this.hudViewfinder.classList.add('suspense');
+            if (this.hudScanTag) this.hudScanTag.textContent = "✓ 100% IDENTIFICADO";
+            if (this.hudScanPercentage) this.hudScanPercentage.textContent = "100%";
+            this.hudStatus.textContent = `✓ ${targetName} Identificado!`;
           }
         } else {
           // Se perder a detecção por mais de 500ms durante o scan, cancela o scan
@@ -261,10 +294,11 @@ class MuseumARApp {
             this.isScanningActive = false;
             this.scanningTargetId = null;
             this.hudViewfinder.classList.remove('scanning');
+            this.hudViewfinder.classList.remove('suspense');
             this.hudStatus.textContent = "Aponte a câmera para uma peça 3D";
           }
 
-          if (!this.isScanningActive) {
+          if (!this.isScanningActive && !this.isSuspenseActive) {
             this.hudViewfinder.classList.remove('detected');
             this.drawTargetHUD(false);
           }
@@ -295,11 +329,9 @@ class MuseumARApp {
 
     if (telemetry.metrics) {
       const elAspect = document.getElementById('m-aspect');
-      const elDensity = document.getElementById('m-density');
       const elTop = document.getElementById('m-top');
       const elSym = document.getElementById('m-sym');
       if (elAspect) elAspect.textContent = telemetry.metrics.aspectRatio;
-      if (elDensity) elDensity.textContent = telemetry.metrics.edgeDensity;
       if (elTop) elTop.textContent = telemetry.metrics.topHeavy;
       if (elSym) elSym.textContent = telemetry.metrics.symmetry;
     }
@@ -338,7 +370,7 @@ class MuseumARApp {
       }
       this.ctx.closePath();
 
-      // Contorno esmeralda/ciano com brilho holográfico
+      // Contorno esmeralda com brilho holográfico
       this.ctx.strokeStyle = "#10b981";
       this.ctx.lineWidth = 5;
       this.ctx.lineCap = "round";
@@ -348,7 +380,7 @@ class MuseumARApp {
       this.ctx.stroke();
 
       // Preenchimento holográfico proporcional ao progresso
-      const alpha = 0.05 + progress * 0.15;
+      const alpha = 0.06 + progress * 0.16;
       this.ctx.fillStyle = `rgba(16, 185, 129, ${alpha})`;
       this.ctx.fill();
 
@@ -364,13 +396,13 @@ class MuseumARApp {
         this.ctx.fill();
       }
 
-      // 2. Linha de Laser de Varredura Vertical passando pelo modelo
+      // 2. Linha de Laser de Varredura Vertical
       const laserY = originY + progress * sDim;
       this.ctx.beginPath();
       this.ctx.moveTo(originX - 10, laserY);
       this.ctx.lineTo(originX + sDim + 10, laserY);
       this.ctx.strokeStyle = "#6ee7b7";
-      this.ctx.lineWidth = 3;
+      this.ctx.lineWidth = 3.5;
       this.ctx.shadowColor = "#10b981";
       this.ctx.shadowBlur = 14;
       this.ctx.stroke();
@@ -379,20 +411,69 @@ class MuseumARApp {
     this.ctx.restore();
   }
 
-  showObjectModal(itemId, bbox, contour) {
+  /**
+   * Efeito de Suspense: Desenha o objeto totalmente branco e brilhando intensamente
+   */
+  drawSuspenseHUD(contour) {
+    if (!this.ctx || !this.overlayCanvas) return;
+    this.ctx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
+
+    const screenW = this.overlayCanvas.width;
+    const screenH = this.overlayCanvas.height;
+    const sDim = Math.min(screenW, screenH) * 0.7;
+    const originX = (screenW - sDim) / 2;
+    const originY = (screenH - sDim) / 2;
+
+    this.ctx.save();
+
+    if (contour && contour.length > 2) {
+      this.ctx.beginPath();
+      const firstX = originX + contour[0].x * sDim;
+      const firstY = originY + contour[0].y * sDim;
+      this.ctx.moveTo(firstX, firstY);
+
+      for (let i = 1; i < contour.length; i++) {
+        const ptX = originX + contour[i].x * sDim;
+        const ptY = originY + contour[i].y * sDim;
+        this.ctx.lineTo(ptX, ptY);
+      }
+      this.ctx.closePath();
+
+      // Preenchimento branco puro e brilhante cobrindo todo o modelo 3D
+      this.ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
+      this.ctx.shadowColor = "#FFFFFF";
+      this.ctx.shadowBlur = 45;
+      this.ctx.fill();
+
+      // Contorno branco espesso com efeito de bloom radiante
+      this.ctx.strokeStyle = "#FFFFFF";
+      this.ctx.lineWidth = 8;
+      this.ctx.lineCap = "round";
+      this.ctx.lineJoin = "round";
+      this.ctx.stroke();
+
+      // Pontos de luz nos vértices
+      for (let i = 0; i < contour.length; i += 2) {
+        const ptX = originX + contour[i].x * sDim;
+        const ptY = originY + contour[i].y * sDim;
+        this.ctx.beginPath();
+        this.ctx.arc(ptX, ptY, 5, 0, Math.PI * 2);
+        this.ctx.fillStyle = "#FFFFFF";
+        this.ctx.shadowColor = "#FFFFFF";
+        this.ctx.shadowBlur = 20;
+        this.ctx.fill();
+      }
+    }
+
+    this.ctx.restore();
+  }
+
+  showObjectModal(itemId) {
     const data = MUSEUM_ITEMS[itemId];
     if (!data) return;
 
     this.currentItemId = itemId;
     this.isObjectModalOpen = true;
-
-    // Preenche os dados no modal
-    const badgeEl = document.getElementById('card-badge');
-    if (badgeEl) {
-      badgeEl.textContent = data.category;
-      badgeEl.style.borderColor = data.badgeColor || '#06b6d4';
-      badgeEl.style.color = data.badgeColor || '#06b6d4';
-    }
 
     const titleEl = document.getElementById('card-title');
     if (titleEl) titleEl.textContent = data.title;
@@ -423,7 +504,7 @@ class MuseumARApp {
     // Carrega o arquivo de áudio MP3 original da peça
     this.loadAudioForCurrentItem();
 
-    // Abre o modal em tela cheia
+    // Abre o modal em tela cheia com animação
     if (this.objectModal) {
       this.objectModal.classList.add('active');
     }
@@ -435,7 +516,9 @@ class MuseumARApp {
     this.isObjectModalOpen = false;
     this.detectionCooldown = Date.now() + 1800; // 1.8 segundos de pausa antes de re-escanear
     this.isScanningActive = false;
+    this.isSuspenseActive = false;
     this.scanningTargetId = null;
+    this.suspenseTargetId = null;
 
     this.stopAudio();
 
@@ -447,6 +530,7 @@ class MuseumARApp {
     if (this.hudViewfinder) {
       this.hudViewfinder.classList.remove('detected');
       this.hudViewfinder.classList.remove('scanning');
+      this.hudViewfinder.classList.remove('suspense');
     }
 
     if (this.ctx && this.overlayCanvas) {

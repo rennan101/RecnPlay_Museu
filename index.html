@@ -19,9 +19,7 @@
 
     <!-- Barra de Topo / Status -->
     <header class="top-bar">
-      <div class="brand-badge">
-        <span class="brand-title">MUSARQ AR</span>
-      </div>
+      <h1 class="brand-title">MUSARQ AR</h1>
       <div class="top-actions">
         <button id="diag-btn" class="icon-btn" title="Painel de Diagnóstico">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -94,7 +92,7 @@
       <!-- Overlay de Progresso de Escaneamento 3D -->
       <div id="hud-scan-overlay" class="hud-scan-overlay">
         <div class="scan-pulse-ring"></div>
-        <div class="scan-status-tag">ESCANEANDO PEÇA</div>
+        <div id="hud-scan-tag" class="scan-status-tag">ESCANEANDO PEÇA</div>
         <div id="hud-scan-percentage" class="scan-percentage">0%</div>
       </div>
       <div id="hud-status" class="hud-label">Iniciando câmera...</div>
@@ -104,9 +102,7 @@
     <div id="object-fullscreen-modal" class="fullscreen-modal-overlay">
       <div class="fullscreen-modal-content">
         <header class="fullscreen-modal-header">
-          <div class="header-badge-wrap">
-            <span id="card-badge" class="badge-tag">Arqueologia</span>
-          </div>
+          <div class="header-modal-title">Acervo do Museu</div>
           <button id="close-object-modal" class="modal-close-icon-btn" title="Fechar e Voltar para a Câmera">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <line x1="18" y1="6" x2="6" y2="18"></line>
