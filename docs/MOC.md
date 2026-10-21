@@ -55,8 +55,8 @@ flowchart TD
 
 ---
 
-## 📱 Mobile: Orientação Horizontal & Startup da Câmera
+## 📱 Mobile & Startup da Câmera
 
-- **Inicialização Assíncrona da Câmera**: `startCamera()` é disparado no primeiro frame sem aguardar o treinamento neural, exibindo a imagem ao vivo em <300ms.
+- **Inicialização Imediata da Câmera**: `startCamera()` é disparado no carregamento sem travas de orientação, exibindo o feed de vídeo em modo retrato ou paisagem imediatamente.
 - **Cache IndexedDB**: Os tensores do classificador KNN são persistidos no navegador (`musarq_cache`), permitindo inicialização da IA em <10ms nos acessos subsequentes.
-- **Guard de Orientação**: Detecta celulares em modo retrato (`orientation: portrait`) e apresenta overlay solicitando rotação para a horizontal, com ativação de tela cheia via `requestFullscreen` e trava de paisagem (`orientation.lock('landscape')`).
+- **UX Sem Barreiras**: O aviso bloqueante de rotação horizontal foi removido, permitindo uso natural tanto na vertical quanto na horizontal.
