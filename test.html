@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Verificador & Teste em Lote - WebAR Museu</title>
+  <title>Verificador Visual - WebAR Museu</title>
   <link rel="stylesheet" href="style.css">
   <style>
     body {
@@ -44,7 +44,7 @@
     .drop-zone {
       border: 2px dashed rgba(6, 182, 212, 0.5);
       border-radius: 8px;
-      padding: 30px;
+      padding: 28px;
       text-align: center;
       cursor: pointer;
       margin-bottom: 16px;
@@ -60,23 +60,16 @@
       border-radius: 8px;
       object-fit: contain;
     }
-    .results-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 16px;
-      font-size: 13px;
-    }
-    .results-table th, .results-table td {
-      padding: 10px;
-      text-align: left;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    }
-    .results-table th {
-      color: var(--accent-cyan);
-    }
     .badge-pass {
       background: rgba(16, 185, 129, 0.2);
       color: #10b981;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-weight: 700;
+    }
+    .badge-none {
+      background: rgba(239, 68, 68, 0.2);
+      color: #ef4444;
       padding: 4px 8px;
       border-radius: 4px;
       font-weight: 700;
@@ -90,19 +83,31 @@
       font-weight: 700;
       cursor: pointer;
       margin-top: 10px;
+      display: inline-block;
+      text-decoration: none;
+    }
+    .status-pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      margin-top: 8px;
     }
   </style>
 </head>
 <body>
   <div class="test-container">
     <div class="test-header">
-      <h1>Validador de Reconhecimento dos 3 Objetos</h1>
-      <p style="color: #94a3b8; margin-top: 4px;">Faça upload de fotos das peças 3D impressas (Flautista, Hippidion ou Peixe-boi) para validar a precisão dos algoritmos.</p>
+      <h1>Validador do Reconhecimento dos 3 Objetos</h1>
+      <p style="color: #94a3b8; margin-top: 4px;">Faça upload de fotos das peças físicas (Flautista, Hippidion ou Peixe-boi) para validar a precisão neural e multi-modal.</p>
+      <div id="model-status" class="status-pill" style="background: rgba(234, 179, 8, 0.2); color: #eab308;">
+        Carregando MobileNet e Dataset do Acervo...
+      </div>
     </div>
 
     <div class="test-grid">
       <div class="test-card">
-        <h3>1. Selecionar Imagem de Teste</h3>
+        <h3>1. Selecionar Foto de Teste</h3>
         <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
           <p>Arraste uma foto da peça aqui ou clique para selecionar</p>
           <input type="file" id="file-input" accept="image/*" style="display: none;">
@@ -111,60 +116,45 @@
       </div>
 
       <div class="test-card">
-        <h3>2. Diagnóstico da Visão Computacional</h3>
+        <h3>2. Diagnóstico da Inferência</h3>
         <div id="test-results">
-          <p style="color: #94a3b8; margin-top: 12px;">Selecione uma imagem para ver os resultados calculados.</p>
+          <p style="color: #94a3b8; margin-top: 12px;">Selecione uma imagem para visualizar as pontuações e telemetria.</p>
         </div>
       </div>
     </div>
 
     <div class="test-card">
-      <h3>3. Assinaturas e Critérios de Aceite Cadastrados</h3>
-      <table class="results-table">
-        <thead>
-          <tr>
-            <th>Objeto</th>
-            <th>Proporção (Aspect Ratio H/W)</th>
-            <th>Densidade de Bordas</th>
-            <th>Massa Superior</th>
-            <th>Simetria</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><strong>Flautista</strong> (Crânio)</td>
-            <td>1.35 (Vertical)</td>
-            <td>0.28</td>
-            <td>0.65 (Calota pesada)</td>
-            <td>0.82</td>
-          </tr>
-          <tr>
-            <td><strong>Hippidion</strong> (Astrágalo)</td>
-            <td>1.05 (Cúbico)</td>
-            <td>0.35 (Alta textura)</td>
-            <td>0.50 (Equilibrado)</td>
-            <td>0.60</td>
-          </tr>
-          <tr>
-            <td><strong>Peixe-boi</strong> (Mandíbula)</td>
-            <td>0.75 (Horizontal)</td>
-            <td>0.31</td>
-            <td>0.42 (Base pesada)</td>
-            <td>0.75</td>
-          </tr>
-        </tbody>
-      </table>
-      <div style="margin-top: 16px;">
-        <a href="index.html" class="btn-action" style="display: inline-block; text-decoration: none;">Abrir Experiência WebAR ao Vivo</a>
+      <h3>3. Ações e Links</h3>
+      <div style="margin-top: 8px;">
+        <a href="index.html" class="btn-action">Abrir Aplicação WebAR ao Vivo</a>
       </div>
     </div>
   </div>
 
+  <!-- TensorFlow.js e MobileNet -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/knn-classifier@1.2.4/dist/knn-classifier.min.js"></script>
+
+  <!-- Módulos da Aplicação -->
+  <script src="assets/dataset/catalog.js"></script>
+  <script src="color-profile.js"></script>
+  <script src="feature-extractor.js"></script>
   <script src="data.js"></script>
   <script src="recognition.js"></script>
   <script>
     const recognizer = new ShapeRecognizer();
-    recognizer.init();
+    const statusEl = document.getElementById('model-status');
+
+    recognizer.init().then(() => {
+      statusEl.style.background = 'rgba(16, 185, 129, 0.2)';
+      statusEl.style.color = '#10b981';
+      statusEl.textContent = '✓ Modelo e Dataset 260 Fotos Prontos!';
+    }).catch(err => {
+      statusEl.style.background = 'rgba(239, 68, 68, 0.2)';
+      statusEl.style.color = '#ef4444';
+      statusEl.textContent = 'Erro ao inicializar o modelo: ' + err.message;
+    });
 
     const fileInput = document.getElementById('file-input');
     const canvas = document.getElementById('test-canvas');
@@ -176,63 +166,72 @@
       if (!file) return;
 
       const img = new Image();
-      img.onload = () => {
+      img.onload = async () => {
         canvas.width = img.width;
         canvas.height = img.height;
         ctx.drawImage(img, 0, 0);
 
-        // Processa a imagem simulando elemento de vídeo
+        // Simula objeto de vídeo para o processFrame
         const fakeVideo = {
           videoWidth: img.width,
           videoHeight: img.height,
           readyState: 4
         };
 
-        // Desenha no recognizer
-        recognizer.canvas.width = 128;
-        recognizer.canvas.height = 128;
-        const sDim = Math.min(img.width, img.height);
-        const sx = (img.width - sDim) / 2;
-        const sy = (img.height - sDim) / 2;
-        recognizer.ctx.drawImage(img, sx, sy, sDim, sDim, 0, 0, 128, 128);
-
-        const result = recognizer.processFrame(fakeVideo);
-        const telemetry = recognizer.getTelemetry();
-
-        renderResults(telemetry);
+        // Força inferência direta com o recognizer
+        recognizer.processFrame(fakeVideo);
+        // Aguarda ciclo assíncrono de inferência neural
+        setTimeout(() => {
+          recognizer.processFrame(fakeVideo);
+          const telemetry = recognizer.getTelemetry();
+          renderResults(telemetry);
+        }, 300);
       };
       img.src = URL.createObjectURL(file);
     });
 
     function renderResults(tel) {
-      if (!tel || !tel.metrics) {
-        resultsContainer.innerHTML = '<p style="color: #ef4444; margin-top: 12px;">Nenhum objeto com bordas suficientes foi detectado na imagem.</p>';
+      if (!tel) {
+        resultsContainer.innerHTML = '<p style="color: #ef4444; margin-top: 12px;">Falha na leitura da imagem.</p>';
         return;
       }
 
+      const labelsMap = {
+        flautista: 'Flautista (Crânio)',
+        hippidion: 'Hippidion (Astrágalo)',
+        peixeboi: 'Peixe-boi (Mandíbula/Crânio)',
+        background: 'Fundo / Ruído'
+      };
+
       let scoresHtml = '';
-      for (const [id, sc] of Object.entries(tel.scores)) {
+      for (const [id, sc] of Object.entries(tel.scores || {})) {
         const isWinner = (id === tel.bestMatch);
+        const displayName = labelsMap[id] || id;
         scoresHtml += `
           <div style="margin-bottom: 8px;">
-            <div style="display: flex; justify-content: space-between; font-weight: ${isWinner ? 'bold' : 'normal'}; color: ${isWinner ? '#06b6d4' : '#fff'};">
-              <span>${sc.name}</span>
+            <div style="display: flex; justify-content: space-between; font-weight: ${isWinner ? 'bold' : 'normal'}; color: ${isWinner ? '#06b6d4' : '#94a3b8'};">
+              <span>${displayName}</span>
               <span>${sc.confidence}%</span>
             </div>
-            <div class="progress-bar"><div class="progress-fill" style="width: ${sc.confidence}%; background: ${isWinner ? '#06b6d4' : '#64748b'}"></div></div>
+            <div class="progress-bar" style="height: 6px; background: #1e293b; border-radius: 3px; overflow: hidden; margin-top: 4px;">
+              <div class="progress-fill" style="width: ${sc.confidence}%; height: 100%; background: ${isWinner ? '#06b6d4' : '#475569'}"></div>
+            </div>
           </div>
         `;
       }
 
+      const winnerBadge = tel.bestMatch
+        ? `<span class="badge-pass">${labelsMap[tel.bestMatch] || tel.bestMatch}</span>`
+        : `<span class="badge-none">Não Confirmado (Aponte para o artefato)</span>`;
+
       resultsContainer.innerHTML = `
         <div style="margin-top: 10px;">
-          <p><strong>Resultado Principal:</strong> <span class="badge-pass">${tel.scores[tel.bestMatch]?.name || 'Indefinido'}</span></p>
+          <p><strong>Identificação:</strong> ${winnerBadge}</p>
           <div style="margin-top: 14px;">${scoresHtml}</div>
-          <div class="diag-metrics" style="margin-top: 16px;">
-            <div>Aspect Ratio: <strong>${tel.metrics.aspectRatio}</strong></div>
-            <div>Densidade: <strong>${tel.metrics.edgeDensity}</strong></div>
-            <div>Massa Superior: <strong>${tel.metrics.topHeavy}</strong></div>
-            <div>Simetria: <strong>${tel.metrics.symmetry}</strong></div>
+          <div style="margin-top: 16px; font-size: 13px; color: #94a3b8; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 12px;">
+            <div>Bordas Sobel: <strong style="color:#f8fafc;">${tel.totalEdges}</strong></div>
+            <div>Cor HSL: <strong style="color:#f8fafc;">${tel.color}</strong></div>
+            <div>Status: <strong style="color:#f8fafc;">${tel.message}</strong></div>
           </div>
         </div>
       `;

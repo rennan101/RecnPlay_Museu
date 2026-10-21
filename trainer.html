@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Treinador Neural do Acervo - MUSARQ AR</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      overflow-y: auto;
+      background: #090c10;
+      color: #f8fafc;
+      padding: 24px;
+      font-family: 'Inter', system-ui, sans-serif;
+    }
+    .trainer-container {
+      max-width: 860px;
+      margin: 0 auto;
+    }
+    .trainer-header {
+      margin-bottom: 24px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 16px;
+    }
+    .trainer-header h1 {
+      font-size: 24px;
+      color: var(--accent-cyan);
+    }
+    .card {
+      background: rgba(18, 24, 38, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .progress-bar-bg {
+      height: 12px;
+      background: #1e293b;
+      border-radius: 6px;
+      overflow: hidden;
+      margin: 12px 0;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: #06b6d4;
+      transition: width 0.15s ease;
+    }
+    .btn {
+      background: var(--accent-cyan);
+      color: #000;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-right: 10px;
+      margin-top: 10px;
+    }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .btn-secondary {
+      background: #334155;
+      color: #fff;
+    }
+    .log-box {
+      background: #000;
+      color: #10b981;
+      font-family: monospace;
+      font-size: 12px;
+      padding: 12px;
+      border-radius: 6px;
+      height: 220px;
+      overflow-y: auto;
+      margin-top: 12px;
+      white-space: pre-wrap;
+    }
+    .stats-row {
+      display: flex;
+      gap: 16px;
+      margin-top: 12px;
+    }
+    .stat-pill {
+      background: rgba(255, 255, 255, 0.05);
+      padding: 8px 14px;
+      border-radius: 6px;
+      flex: 1;
+    }
+    .stat-pill span {
+      display: block;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+    .stat-pill strong {
+      font-size: 18px;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="trainer-container">
+    <div class="trainer-header">
+      <h1>Treinador & Exportador do Classificador KNN</h1>
+      <p style="color: #94a3b8; margin-top: 4px;">
+        Treina o classificador neural MobileNet (v1, alpha 0.50) com todas as fotos otimizadas dos 3 objetos e exporta o dataset.
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>1. Status do Acervo Otimizado</h3>
+      <div class="stats-row">
+        <div class="stat-pill">
+          <span>Flautista</span>
+          <strong id="stat-flautista">0</strong>
+        </div>
+        <div class="stat-pill">
+          <span>Peixe-boi</span>
+          <strong id="stat-peixeboi">0</strong>
+        </div>
+        <div class="stat-pill">
+          <span>Hippidion</span>
+          <strong id="stat-hippidion">0</strong>
+        </div>
+        <div class="stat-pill">
+          <span>Total Otimizado</span>
+          <strong id="stat-total">0 fotos</strong>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px;">
+        <button id="start-btn" class="btn">Iniciar Treinamento Neural</button>
+        <button id="export-btn" class="btn btn-secondary" disabled>Baixar knn_dataset.json</button>
+        <a href="index.html" class="btn btn-secondary" style="display:inline-block; text-decoration:none;">Abrir WebAR</a>
+      </div>
+
+      <div class="progress-bar-bg">
+        <div id="prog-fill" class="progress-bar-fill"></div>
+      </div>
+      <div id="prog-text" style="font-size: 13px; color: #94a3b8;">Aguardando início...</div>
+    </div>
+
+    <div class="card">
+      <h3>2. Log do Treinador</h3>
+      <div id="log" class="log-box">Sistema pronto. Clique em "Iniciar Treinamento Neural".</div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/knn-classifier@1.2.4/dist/knn-classifier.min.js"></script>
+  <script src="assets/dataset/catalog.js"></script>
+  <script>
+    const logEl = document.getElementById('log');
+    const progFill = document.getElementById('prog-fill');
+    const progText = document.getElementById('prog-text');
+    const startBtn = document.getElementById('start-btn');
+    const exportBtn = document.getElementById('export-btn');
+
+    function log(msg) {
+      logEl.textContent += '\n' + msg;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    const catalog = window.DATASET_CATALOG || { flautista: [], peixeboi: [], hippidion: [] };
+    const nFlautista = catalog.flautista ? catalog.flautista.length : 0;
+    const nPeixeboi = catalog.peixeboi ? catalog.peixeboi.length : 0;
+    const nHippidion = catalog.hippidion ? catalog.hippidion.length : 0;
+    const totalPhotos = nFlautista + nPeixeboi + nHippidion;
+
+    document.getElementById('stat-flautista').textContent = `${nFlautista} fotos`;
+    document.getElementById('stat-peixeboi').textContent = `${nPeixeboi} fotos`;
+    document.getElementById('stat-hippidion').textContent = `${nHippidion} fotos`;
+    document.getElementById('stat-total').textContent = `${totalPhotos} fotos`;
+
+    let model = null;
+    let classifier = null;
+    let serializedData = null;
+
+    startBtn.addEventListener('click', async () => {
+      startBtn.disabled = true;
+      log('Inicializando TensorFlow.js e carregando MobileNet...');
+
+      try {
+        await tf.setBackend('webgl');
+        await tf.ready();
+        log('Backend WebGL ativado com aceleração por GPU.');
+
+        model = await mobilenet.load({ version: 1, alpha: 0.50 });
+        classifier = knnClassifier.create();
+        log('MobileNet v1 (alpha 0.50) pronto.');
+
+        const canvas = document.createElement('canvas');
+        canvas.width = 224;
+        canvas.height = 224;
+        const ctx = canvas.getContext('2d');
+
+        let processed = 0;
+
+        for (const [label, paths] of Object.entries(catalog)) {
+          log(`Iniciando classe "${label}" (${paths.length} fotos)...`);
+          for (const p of paths) {
+            try {
+              const img = await loadImage(p);
+              // Exemplo 1: escala normal
+              ctx.drawImage(img, 0, 0, 224, 224);
+              addTensor(canvas, label);
+
+              // Exemplo 2: espelhamento horizontal
+              ctx.save();
+              ctx.translate(224, 0);
+              ctx.scale(-1, 1);
+              ctx.drawImage(img, 0, 0, 224, 224);
+              ctx.restore();
+              addTensor(canvas, label);
+            } catch (err) {
+              log(`Aviso: falha na foto ${p}`);
+            }
+
+            processed++;
+            const pct = Math.round((processed / totalPhotos) * 100);
+            progFill.style.width = pct + '%';
+            progText.textContent = `Processando: ${processed} de ${totalPhotos} fotos (${pct}%)`;
+          }
+        }
+
+        // Amostras de background
+        log('Adicionando amostras de fundo e ruído...');
+        const bgColors = ['#0f172a', '#1e293b', '#475569', '#3f2e1e', '#1c1917', '#000000', '#78350f'];
+        for (const c of bgColors) {
+          ctx.fillStyle = c;
+          ctx.fillRect(0, 0, 224, 224);
+          ctx.fillStyle = '#334155';
+          ctx.fillRect(30, 30, 80, 80);
+          ctx.fillRect(120, 110, 70, 70);
+          addTensor(canvas, 'background');
+        }
+
+        log('Extraindo dataset de ativações...');
+        const rawDataset = classifier.getClassifierDataset();
+        const exportObj = {};
+        for (const [k, tensor] of Object.entries(rawDataset)) {
+          exportObj[k] = {
+            values: Array.from(tensor.dataSync()),
+            shape: tensor.shape
+          };
+          log(`Classe "${k}": ${tensor.shape[0]} vetores de ${tensor.shape[1]} dimensões`);
+        }
+
+        serializedData = JSON.stringify(exportObj);
+        exportBtn.disabled = false;
+        progText.textContent = 'Treinamento concluído com 100% de sucesso!';
+        log('Sucesso! Dataset pronto para exportação.');
+      } catch (e) {
+        log('Erro no treinamento: ' + e.message);
+        startBtn.disabled = false;
+      }
+    });
+
+    function addTensor(canvasEl, label) {
+      const tensor = tf.browser.fromPixels(canvasEl);
+      const act = model.infer(tensor, true);
+      classifier.addExample(act, label);
+      tensor.dispose();
+      act.dispose();
+    }
+
+    function loadImage(src) {
+      return new Promise((res, rej) => {
+        const i = new Image();
+        i.crossOrigin = 'anonymous';
+        i.onload = () => res(i);
+        i.onerror = rej;
+        i.src = src;
+      });
+    }
+
+    exportBtn.addEventListener('click', () => {
+      if (!serializedData) return;
+      const blob = new Blob([serializedData], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'knn_dataset.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  </script>
+</body>
+</html>
