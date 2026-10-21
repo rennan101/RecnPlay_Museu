@@ -18,7 +18,8 @@ flowchart TD
         EDGES["feature-extractor.js<br/>(FeatureExtractor)"] --> RECOG
         TFJS["TensorFlow.js + MobileNet v1<br/>+ KNN-Classifier"] --> RECOG
         
-        RECOG --> APP["app.js<br/>(MuseumARApp)"]
+        RECOG --> LOAD["loading.js<br/>(LoadingScreen 0%-100%)"]
+        LOAD --> APP["app.js<br/>(MuseumARApp)"]
         APP --> HUD["HUD Holográfico &amp; Modal"]
     end
 ```
@@ -27,6 +28,7 @@ flowchart TD
 
 ## 📦 Módulos do Sistema
 
+- [[loading]]: Tela de carregamento imersiva com barra de progresso em tempo real (0% a 100%), mensagens dinâmicas de calibração neural e fallback de erro.
 - [[color-profile]]: Validação de plausibilidade cromática em espaço de cor HSL, calibrada pelas estatísticas empíricas das fotos físicas do acervo.
 - [[feature-extractor]]: Convolução com operador Sobel 3x3 para densidade de bordas e cálculo de contorno periférico radial de 24 pontos.
 - [[recognition]]: Orquestrador central que executa MobileNet (v1, alpha 0.50), infere a classe através de KNN ponderado (k=5) e aplica fusão multi-modal (Neural + HSL + Bordas).

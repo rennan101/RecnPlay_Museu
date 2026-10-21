@@ -15,6 +15,43 @@
 </head>
 <body>
   <div id="app">
+    <!-- Tela de Carregamento Inicial (Calibração Neural do Acervo) -->
+    <div id="startup-loading-screen" class="startup-loading-overlay">
+      <div class="loading-container">
+        <!-- Ícone SVG de Scanner Neural sob demanda -->
+        <div class="loading-icon-badge">
+          <svg class="loading-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </div>
+
+        <div class="loading-branding">
+          <h2 class="loading-title">MUSARQ AR</h2>
+          <span class="loading-subtitle">Museu de Arqueologia e Ciências Naturais</span>
+        </div>
+
+        <div class="loading-progress-box">
+          <div class="loading-bar-header">
+            <span id="loading-status-text" class="loading-status">Carregando componentes de visão...</span>
+            <span id="loading-percentage" class="loading-pct">0%</span>
+          </div>
+          <div class="loading-bar-track">
+            <div id="loading-bar-fill" class="loading-bar-fill" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <p class="loading-hint">Aguarde a calibração neural das peças antes de iniciar o escaneamento.</p>
+
+        <button id="loading-retry-btn" class="loading-retry-action" style="display: none;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+          </svg>
+          <span>Tentar Novamente</span>
+        </button>
+      </div>
+    </div>
+
     <!-- Camada de Câmera Realtime -->
     <div id="camera-container">
       <video id="video" autoplay playsinline muted></video>
@@ -221,6 +258,7 @@
 
   <!-- Scripts da Aplicação -->
   <script src="assets/dataset/catalog.js"></script>
+  <script src="loading.js"></script>
   <script src="color-profile.js"></script>
   <script src="feature-extractor.js"></script>
   <script src="data.js"></script>

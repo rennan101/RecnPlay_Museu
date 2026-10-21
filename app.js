@@ -65,24 +65,47 @@ class MuseumARApp {
     this.lastFpsTime = performance.now();
     this.currentFps = 0;
     
+    this.loadingScreen = typeof LoadingScreen !== 'undefined' ? new LoadingScreen() : null;
+
     this.init();
   }
 
   async init() {
     this.setupEventListeners();
-    // Inicia a câmera IMEDIATAMENTE sem esperar pelo treino do modelo
+    // Inicia a câmera em paralelo para warm-up e permissões enquanto os pesos baixam
     this.startCamera();
     this.startProcessingLoop();
 
-    // Carrega o classificador neural em paralelo em segundo plano
     if (this.hudStatus) {
-      this.hudStatus.textContent = "Carregando câmera...";
+      this.hudStatus.textContent = "Calibrando visão computacional...";
     }
-    this.recognizer.init().then(() => {
-      if (this.hudStatus && !this.isScanningActive && !this.isSuspenseActive) {
-        this.hudStatus.textContent = "Aponte a câmera para uma peça 3D";
+
+    try {
+      await this.recognizer.init((info) => {
+        if (this.loadingScreen) {
+          this.loadingScreen.update(info.progress, info.message);
+        }
+      });
+
+      if (this.loadingScreen) {
+        this.loadingScreen.complete(() => {
+          if (this.hudStatus && !this.isScanningActive && !this.isSuspenseActive) {
+            this.hudStatus.textContent = "Aponte a câmera para uma peça 3D";
+          }
+        });
+      } else {
+        if (this.hudStatus && !this.isScanningActive && !this.isSuspenseActive) {
+          this.hudStatus.textContent = "Aponte a câmera para uma peça 3D";
+        }
       }
-    });
+    } catch (err) {
+      console.error('Falha na calibração neural:', err);
+      if (this.loadingScreen) {
+        this.loadingScreen.showError("Falha na calibração neural. Verifique sua conexão.", () => {
+          this.init();
+        });
+      }
+    }
   }
 
   setupEventListeners() {

@@ -22,9 +22,14 @@ class ShapeRecognizer {
     this.featureExtractor = new FeatureExtractor({ sobelThreshold: 0.14 });
   }
 
-  async init() {
+  async init(onProgress) {
+    const notify = (phase, progress, message) => {
+      if (typeof onProgress === 'function') onProgress({ phase, progress, message });
+    };
+
     try {
       if (typeof tf !== 'undefined') {
+        notify('backend', 12, 'Inicializando aceleração por GPU (WebGL)...');
         try {
           await tf.setBackend('webgl');
           await tf.ready();
@@ -34,27 +39,38 @@ class ShapeRecognizer {
         }
 
         if (typeof mobilenet !== 'undefined' && typeof knnClassifier !== 'undefined') {
+          notify('mobilenet', 35, 'Carregando rede neural MobileNet...');
           this.model = await mobilenet.load({ version: 1, alpha: 0.50 });
           this.classifier = knnClassifier.create();
 
+          notify('cache', 50, 'Verificando modelos do acervo...');
           const loadedJson = await this.tryLoadDatasetJson('assets/model/knn_dataset.json');
           if (!loadedJson) {
             const loadedCache = await this.tryLoadFromCache();
             if (!loadedCache) {
-              await this.trainFromCatalog();
+              notify('training', 55, 'Calibrando amostras fotográficas...');
+              await this.trainFromCatalog((curr, total) => {
+                const subPct = Math.round(55 + (curr / total) * 38);
+                notify('training', subPct, `Calibrando acervo fotográfico (${curr}/${total})...`);
+              });
               this.saveToCache();
+            } else {
+              notify('cache', 95, 'Acervo recuperado do cache local.');
             }
+          } else {
+            notify('cache', 95, 'Dataset neural pré-compilado carregado.');
           }
         }
       }
+      notify('ready', 100, 'Tudo pronto para escanear!');
       this.isModelLoading = false;
       this.isReady = true;
       return true;
     } catch (err) {
       console.error('Falha na inicialização do ShapeRecognizer:', err);
       this.isModelLoading = false;
-      this.isReady = true;
-      return false;
+      this.isReady = false;
+      throw err;
     }
   }
 
@@ -114,7 +130,7 @@ class ShapeRecognizer {
     }
   }
 
-  async trainFromCatalog() {
+  async trainFromCatalog(onProgress) {
     const catalog = window.DATASET_CATALOG;
     if (!catalog || !this.model || !this.classifier) return;
 
@@ -123,15 +139,23 @@ class ShapeRecognizer {
     trainCanvas.height = 224;
     const tCtx = trainCanvas.getContext('2d');
 
+    const tasks = [];
     for (const [label, paths] of Object.entries(catalog)) {
       const step = Math.max(1, Math.floor(paths.length / 28));
       const sampled = paths.filter((_, idx) => idx % step === 0);
+      tasks.push({ label, sampled });
+    }
+    const totalSamples = tasks.reduce((sum, t) => sum + t.sampled.length, 0);
+    let processedSamples = 0;
 
+    for (const { label, sampled } of tasks) {
       for (let i = 0; i < sampled.length; i += 6) {
         const batch = sampled.slice(i, i + 6);
         const images = await Promise.all(batch.map(p => this.loadImage(p).catch(() => null)));
 
         for (const img of images) {
+          processedSamples++;
+          if (typeof onProgress === 'function') onProgress(processedSamples, totalSamples);
           if (!img) continue;
           tCtx.drawImage(img, 0, 0, 224, 224);
           this.addExample(trainCanvas, label);
