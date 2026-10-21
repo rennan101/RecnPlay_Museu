@@ -70,9 +70,61 @@ class MuseumARApp {
 
   async init() {
     this.setupEventListeners();
-    await this.recognizer.init();
-    await this.startCamera();
+    this.setupOrientationAndFullscreen();
+    // Inicia a câmera IMEDIATAMENTE sem esperar pelo treino do modelo
+    this.startCamera();
     this.startProcessingLoop();
+
+    // Carrega o classificador neural em paralelo em segundo plano
+    if (this.hudStatus) {
+      this.hudStatus.textContent = "Carregando câmera...";
+    }
+    this.recognizer.init().then(() => {
+      if (this.hudStatus && !this.isScanningActive && !this.isSuspenseActive) {
+        this.hudStatus.textContent = "Aponte a câmera para uma peça 3D";
+      }
+    });
+  }
+
+  setupOrientationAndFullscreen() {
+    const triggerFullscreen = async () => {
+      try {
+        const docEl = document.documentElement;
+        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+          if (docEl.requestFullscreen) {
+            await docEl.requestFullscreen();
+          } else if (docEl.webkitRequestFullscreen) {
+            await docEl.webkitRequestFullscreen();
+          }
+        }
+      } catch (err) {
+        // Bloqueio silencioso se a API não estiver disponível
+      }
+
+      try {
+        if (screen.orientation && screen.orientation.lock) {
+          await screen.orientation.lock('landscape');
+        }
+      } catch (err) {
+        // iOS Safari não implementa lock de orientação
+      }
+    };
+
+    const enterBtn = document.getElementById('enter-fullscreen-btn');
+    if (enterBtn) {
+      enterBtn.addEventListener('click', () => {
+        triggerFullscreen();
+      });
+    }
+
+    // Primeiro toque em qualquer lugar da tela tenta colocar em tela cheia e paisagem
+    const onFirstTouch = () => {
+      triggerFullscreen();
+      window.removeEventListener('touchstart', onFirstTouch);
+      window.removeEventListener('click', onFirstTouch);
+    };
+    window.addEventListener('touchstart', onFirstTouch, { passive: true });
+    window.addEventListener('click', onFirstTouch, { passive: true });
   }
 
   setupEventListeners() {

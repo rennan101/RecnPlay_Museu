@@ -52,3 +52,11 @@ flowchart TD
    - Classificação: Astrágalo (osso do tornozelo de cavalo pré-histórico).
    - HSL: Neutro / Acromático (baixa saturação <= 0.15), Luminosidade 0.45–0.75.
    - Amostras no Dataset: 41 fotos com rotações das superfícies articulares.
+
+---
+
+## 📱 Mobile: Orientação Horizontal & Startup da Câmera
+
+- **Inicialização Assíncrona da Câmera**: `startCamera()` é disparado no primeiro frame sem aguardar o treinamento neural, exibindo a imagem ao vivo em <300ms.
+- **Cache IndexedDB**: Os tensores do classificador KNN são persistidos no navegador (`musarq_cache`), permitindo inicialização da IA em <10ms nos acessos subsequentes.
+- **Guard de Orientação**: Detecta celulares em modo retrato (`orientation: portrait`) e apresenta overlay solicitando rotação para a horizontal, com ativação de tela cheia via `requestFullscreen` e trava de paisagem (`orientation.lock('landscape')`).
